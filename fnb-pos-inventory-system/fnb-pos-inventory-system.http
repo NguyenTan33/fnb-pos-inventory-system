@@ -1,0 +1,6 @@
+@fnb_pos_inventory_system_HostAddress = http://localhost:5018
+
+GET {{fnb_pos_inventory_system_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
