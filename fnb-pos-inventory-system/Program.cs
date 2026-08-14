@@ -20,6 +20,7 @@ builder.Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPhoneService, PhoneService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
+builder.Services.AddScoped<IOtpHashService, OtpHashService>();
 
 var app = builder.Build();
 

@@ -27,5 +27,14 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             // Return a 201 Created response with the RegisterResponse object
             return CreatedAtAction(nameof(Register), new { id = response.UserId }, response);
         }
+
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyRegisterOtp([FromBody] VerifyRegisterOtpRequest request)
+        {
+            // Call the VerifyRegisterOtpAsync method from the IAuthService
+            var response = await _authService.VerifyRegisterOtpAsync(request);
+            // Return a 200 OK response with the VerifyRegisterOtpResponse object
+            return Ok(response);
+        }
     }
 }
