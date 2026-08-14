@@ -1,8 +1,23 @@
+using fnb_pos_inventory_system;
+using fnb_pos_inventory_system.Areas.Auth.Services;
+using fnb_pos_inventory_system.Entities;
+using fnb_pos_inventory_system.Services.Auth;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services
+    .AddIdentityApiEndpoints<Account>()
+    .AddEntityFrameworkStores<ApplicationDbContext>();
+
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 
