@@ -1,6 +1,7 @@
-﻿using System.Text.RegularExpressions;
+﻿using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
+using System.Text.RegularExpressions;
 
-namespace fnb_pos_inventory_system.Areas.Auth.Services
+namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
 {
     public class PhoneService : IPhoneService
     {

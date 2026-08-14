@@ -1,12 +1,13 @@
 ﻿using fnb_pos_inventory_system.Areas.Auth.DTOs;
+using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
 using fnb_pos_inventory_system.Entities;
 using fnb_pos_inventory_system.Exceptions;
-using fnb_pos_inventory_system.Services.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
-namespace fnb_pos_inventory_system.Areas.Auth.Services;
+namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations;
 public class AuthService : IAuthService
 {
     //Dependency Injection
@@ -33,6 +34,8 @@ public class AuthService : IAuthService
         {
             throw new BusinessException("Số điện thoại không hợp lệ.");
         }
+
+        var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
         // Check if the phone number is already registered
         var existingUser = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phonenumber);

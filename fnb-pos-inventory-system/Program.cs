@@ -1,7 +1,7 @@
 using fnb_pos_inventory_system;
-using fnb_pos_inventory_system.Areas.Auth.Services;
+using fnb_pos_inventory_system.Areas.Auth.Services.Implementations;
+using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
 using fnb_pos_inventory_system.Entities;
-using fnb_pos_inventory_system.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

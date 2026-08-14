@@ -1,5 +1,6 @@
-﻿
-namespace fnb_pos_inventory_system.Areas.Auth.Services
+﻿using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
+
+namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
 {
     public class SmsService : ISmsService
     {

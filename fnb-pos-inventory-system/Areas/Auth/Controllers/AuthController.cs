@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using fnb_pos_inventory_system.Services.Auth;
 using fnb_pos_inventory_system.Areas.Auth.DTOs;
+using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
 
 namespace fnb_pos_inventory_system.Areas.Auth.Controllers
 {

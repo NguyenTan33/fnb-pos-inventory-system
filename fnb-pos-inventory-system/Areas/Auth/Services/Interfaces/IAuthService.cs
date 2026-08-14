@@ -1,6 +1,6 @@
 using fnb_pos_inventory_system.Areas.Auth.DTOs;
 
-namespace fnb_pos_inventory_system.Services.Auth
+namespace fnb_pos_inventory_system.Areas.Auth.Services.Interfaces
 {
     public interface IAuthService
     {
