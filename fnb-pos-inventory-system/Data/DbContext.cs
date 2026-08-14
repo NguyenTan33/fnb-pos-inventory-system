@@ -18,4 +18,6 @@ public class ApplicationDbContext
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
+
+    public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
 }

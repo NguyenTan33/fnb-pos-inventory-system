@@ -11,18 +11,28 @@ public class AuthService : IAuthService
 {
     //Dependency Injection
     private readonly UserManager<Account> _userManager;
+    private readonly IPhoneService _phoneService;
+    private readonly ISmsService _smsService;
 
     // Constructor
-    public AuthService(UserManager<Account> userManager)
+    public AuthService(UserManager<Account> userManager, IPhoneService phoneService, ISmsService smsService )
     {
         _userManager = userManager;
+        _phoneService = phoneService;
+        _smsService = smsService;
     }
 
     // Implement the RegisterAsync method
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request)
     {
         // Validate the request
-        var phonenumber = request.PhoneNumber.Trim();
+        var phonenumber = _phoneService.Normalize(request.PhoneNumber);
+
+        // Validate the phone number format
+        if (!_phoneService.IsValid(phonenumber))
+        {
+            throw new BusinessException("Số điện thoại không hợp lệ.");
+        }
 
         // Check if the phone number is already registered
         var existingUser = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phonenumber);
@@ -61,7 +71,5 @@ public class AuthService : IAuthService
         };
 
         return response;
-
-        throw new NotImplementedException();
     }
 }

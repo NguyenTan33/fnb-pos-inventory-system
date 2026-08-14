@@ -8,12 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Areas\Auth\Data\**" />
+    <Compile Remove="Areas\Auth\Models\**" />
+    <Compile Remove="Areas\Auth\Views\**" />
     <Compile Remove="Areas\Cashier\**" />
     <Compile Remove="Controllers\**" />
+    <Content Remove="Areas\Auth\Data\**" />
+    <Content Remove="Areas\Auth\Models\**" />
+    <Content Remove="Areas\Auth\Views\**" />
     <Content Remove="Areas\Cashier\**" />
     <Content Remove="Controllers\**" />
+    <EmbeddedResource Remove="Areas\Auth\Data\**" />
+    <EmbeddedResource Remove="Areas\Auth\Models\**" />
+    <EmbeddedResource Remove="Areas\Auth\Views\**" />
     <EmbeddedResource Remove="Areas\Cashier\**" />
     <EmbeddedResource Remove="Controllers\**" />
+    <None Remove="Areas\Auth\Data\**" />
+    <None Remove="Areas\Auth\Models\**" />
+    <None Remove="Areas\Auth\Views\**" />
     <None Remove="Areas\Cashier\**" />
     <None Remove="Controllers\**" />
   </ItemGroup>
@@ -33,9 +45,6 @@
     <Folder Include="Areas\Admin\Data\" />
     <Folder Include="Areas\Admin\Models\" />
     <Folder Include="Areas\Admin\Views\" />
-    <Folder Include="Areas\Auth\Data\" />
-    <Folder Include="Areas\Auth\Models\" />
-    <Folder Include="Areas\Auth\Views\" />
     <Folder Include="Areas\Customer\Controllers\" />
     <Folder Include="Areas\Customer\Data\" />
     <Folder Include="Areas\Customer\Models\" />
