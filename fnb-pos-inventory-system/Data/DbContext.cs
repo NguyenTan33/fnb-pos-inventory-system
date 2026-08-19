@@ -15,9 +15,16 @@ public class ApplicationDbContext
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        builder.Entity<RefreshToken>()
+            .HasOne(x => x.Account)
+            .WithMany()
+            .HasForeignKey(x => x.AccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 
     public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 }

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using fnb_pos_inventory_system.Areas.Auth.DTOs;
 using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace fnb_pos_inventory_system.Areas.Auth.Controllers
 {
@@ -35,6 +36,29 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             var response = await _authService.VerifyRegisterOtpAsync(request);
             // Return a 200 OK response with the VerifyRegisterOtpResponse object
             return Ok(response);
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            // Call the LoginAsync method from the IAuthService
+            var response = await _authService.LoginAsync(request);
+            // Return a 200 OK response with the LoginResponse object
+            return Ok(response);
+        }
+
+        [Authorize]
+        [HttpGet("test-auth")]
+        public IActionResult TestAuth()
+        {
+            return Ok("JWT hợp lệ.");
+        }
+
+        [Authorize(Roles = "Admin,User")]
+        [HttpGet("test-user-role")]
+        public IActionResult TestUserRole()
+        {
+            return Ok("Bạn có role User.");
         }
     }
 }

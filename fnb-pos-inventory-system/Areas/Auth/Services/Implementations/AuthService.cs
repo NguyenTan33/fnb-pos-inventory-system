@@ -16,6 +16,7 @@ public class AuthService : IAuthService
     private readonly ISmsService _smsService;
     private readonly IOtpHashService _otpHashService;
     private readonly ApplicationDbContext _context;
+    private readonly ITokenService _tokenService;
 
     // Constructor
     public AuthService(
@@ -23,6 +24,7 @@ public class AuthService : IAuthService
         IPhoneService phoneService,
         ISmsService smsService,
         IOtpHashService otpHashService,
+        ITokenService tokenService,
         ApplicationDbContext context)
     {
         _userManager = userManager;
@@ -30,6 +32,7 @@ public class AuthService : IAuthService
         _smsService = smsService;
         _otpHashService = otpHashService;
         _context = context;
+        _tokenService = tokenService;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request)
@@ -65,6 +68,9 @@ public class AuthService : IAuthService
         var result = await _userManager.CreateAsync(
             account,
             request.Password);
+
+        // Assign "User" role to the newly created account
+        var roleResult = await _userManager.AddToRoleAsync(account, "User");
 
         // 6. Check account creation result
         if (!result.Succeeded)
@@ -186,4 +192,52 @@ public class AuthService : IAuthService
             UserId = account.Id
         };
     }
+
+    public async Task<LoginResponse> LoginAsync(LoginRequest request)
+    {
+        // Normalize phone number
+        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+
+        // Validate phone number
+        if (!_phoneService.IsValid(phoneNumber))
+        {
+            throw new BusinessException("Số điện thoại không hợp lệ.");
+        }
+
+        //  Find account by phone number
+        var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+
+        // Check if account exists and password is correct
+        if (account == null)
+        {
+            throw new BusinessException("Số điện thoại hoặc mật khẩu không chính xác.");
+        }
+
+        // Check if phone number is confirmed
+        if (!account.PhoneNumberConfirmed) 
+        {
+            throw new BusinessException("Số điện thoại chưa được xác thực.");
+        }
+
+        // Check if password is correct
+        var isPasswordValid = await _userManager.CheckPasswordAsync(account, request.Password);
+
+        // If password is not valid, throw an exception
+        if (!isPasswordValid)
+        {
+            throw new BusinessException("Số điện thoại hoặc mật khẩu không chính xác.");
+        }
+
+        // Generate access token
+        var accessToken =await _tokenService.GenerateAccessTokenAsync(account);
+
+        var response = new LoginResponse
+        {
+            AccessToken = accessToken,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(60)
+        };
+
+        return response;
+    }
+
 }
