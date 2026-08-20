@@ -4,12 +4,12 @@ using System.Text;
 
 namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
 {
-    public class OtpHashService : IOtpHashService
+    public class HashService : IHashService
     {
         private readonly string _secret;
 
         // Constructor
-        public OtpHashService(IConfiguration configuration)
+        public HashService(IConfiguration configuration)
         {
             // Get the OTP secret from configuration
             _secret = configuration["Otp:Secret"] ?? throw new InvalidOperationException("OTP secret chưa được cấu hình.");

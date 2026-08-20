@@ -14,7 +14,7 @@ public class AuthService : IAuthService
     private readonly UserManager<Account> _userManager;
     private readonly IPhoneService _phoneService;
     private readonly ISmsService _smsService;
-    private readonly IOtpHashService _otpHashService;
+    private readonly IHashService _otpHashService;
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
 
@@ -23,7 +23,7 @@ public class AuthService : IAuthService
         UserManager<Account> userManager,
         IPhoneService phoneService,
         ISmsService smsService,
-        IOtpHashService otpHashService,
+        IHashService otpHashService,
         ITokenService tokenService,
         ApplicationDbContext context)
     {
