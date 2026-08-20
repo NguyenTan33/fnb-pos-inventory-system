@@ -14,25 +14,28 @@ public class AuthService : IAuthService
     private readonly UserManager<Account> _userManager;
     private readonly IPhoneService _phoneService;
     private readonly ISmsService _smsService;
-    private readonly IHashService _otpHashService;
+    private readonly IHashService _hashService;
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
+    private readonly IConfiguration _configuration;
 
     // Constructor
     public AuthService(
         UserManager<Account> userManager,
         IPhoneService phoneService,
         ISmsService smsService,
-        IHashService otpHashService,
+        IHashService HashService,
         ITokenService tokenService,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        IConfiguration configuration)
     {
         _userManager = userManager;
         _phoneService = phoneService;
         _smsService = smsService;
-        _otpHashService = otpHashService;
+        _hashService = HashService;
         _context = context;
         _tokenService = tokenService;
+        _configuration = configuration;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request)
@@ -69,9 +72,6 @@ public class AuthService : IAuthService
             account,
             request.Password);
 
-        // Assign "User" role to the newly created account
-        var roleResult = await _userManager.AddToRoleAsync(account, "User");
-
         // 6. Check account creation result
         if (!result.Succeeded)
         {
@@ -82,13 +82,28 @@ public class AuthService : IAuthService
             throw new BusinessException(errors);
         }
 
+
+        // Assign "User" role to the newly created account
+        var roleResult = await _userManager.AddToRoleAsync(account, "User");
+
+        if (!roleResult.Succeeded)
+        {
+            var errors = string.Join(
+                ", ",
+                roleResult.Errors.Select(e => e.Description));
+
+            throw new BusinessException(errors);
+        }
+
         // 7. Generate 6-digit OTP
         var otp = RandomNumberGenerator
             .GetInt32(100000, 1000000)
             .ToString();
 
         // 8. Hash OTP before storing it
-        var otpHash = _otpHashService.Hash(otp);
+        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
+
+        var otpHash = _hashService.Hash(otp, otpSecret);
 
         // 9. Create OTP verification record
         var otpVerification = new OtpVerification
@@ -157,14 +172,20 @@ public class AuthService : IAuthService
             throw new BusinessException("Mã OTP đã bị khóa.");
         }
 
+        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
+
         // 7. Verify OTP
-        if (!_otpHashService.Verify(request.Otp , otpVerification.OtpHash))
+        if (!_hashService.Verify(
+            request.Otp,
+            otpVerification.OtpHash,
+            otpSecret))
         {
-            // Increment failed attempts and save changes
             otpVerification.FailedAttempts++;
+
             await _context.SaveChangesAsync();
 
-            throw new BusinessException("Mã OTP không hợp lệ.");
+            throw new BusinessException(
+                "Mã OTP không hợp lệ.");
         }
 
         // 8. Save changes to OTP verification record
@@ -197,7 +218,7 @@ public class AuthService : IAuthService
     {
         // Normalize phone number
         var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
-
+       
         // Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
         {
@@ -231,9 +252,33 @@ public class AuthService : IAuthService
         // Generate access token
         var accessToken =await _tokenService.GenerateAccessTokenAsync(account);
 
+        // Generate refresh token
+        var refreshToken = _tokenService.GenerateRefreshToken();
+
+        // Store refresh token in database
+        var refreshTokenSecret = _configuration["RefreshToken:Secret"] ?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
+
+        // Hash the refresh token before storing it
+        var refreshTokenHash = _hashService.Hash(refreshToken, refreshTokenSecret);
+
+        var refreshTokenExpireDays = int.Parse(_configuration["RefreshToken:ExpireDays"] ?? "7");
+
+        var refreshTokenEntity = new RefreshToken
+        {
+            AccountId = account.Id,
+            TokenHash = refreshTokenHash,
+            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenExpireDays),
+            IsRevoked = false
+        };
+
+        _context.RefreshTokens.Add(refreshTokenEntity);
+
+        await _context.SaveChangesAsync();
+
         var response = new LoginResponse
         {
             AccessToken = accessToken,
+            RefreshToken = refreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(60)
         };
 

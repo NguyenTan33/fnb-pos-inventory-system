@@ -2,7 +2,8 @@
 {
     public interface IHashService
     {
-        string Hash(string otp);
-        bool Verify(string otp, string hash);
+        string Hash(string value, string secret);
+
+        bool Verify(string value, string hash, string secret);
     }
 }
