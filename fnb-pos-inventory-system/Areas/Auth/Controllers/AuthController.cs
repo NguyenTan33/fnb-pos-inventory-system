@@ -70,5 +70,17 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
 
             return Ok(response);
         }
+
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+        {
+            await _authService.LogoutAsync(request);
+
+            return Ok(new
+            {
+                message = "Đăng xuất thành công."
+            });
+        }
     }
 }

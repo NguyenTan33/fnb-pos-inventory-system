@@ -398,4 +398,39 @@ public class AuthService : IAuthService
                 accessTokenExpireMinutes)
         };
     }
+
+    public async Task LogoutAsync(LogoutRequest request)
+    {
+        // 1. Validate refresh token
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            throw new BusinessException("Refresh Token không hợp lệ.");
+        }
+
+        // 2. Get refresh token secret
+        var refreshTokenSecret =_configuration["RefreshToken:Secret"]?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
+
+        // 3. Hash provided refresh token
+        var refreshTokenHash =_hashService.Hash(request.RefreshToken,refreshTokenSecret);
+
+        // 4. Find stored refresh token
+        var storedRefreshToken =await _context.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == refreshTokenHash);
+
+        // 5. Check existence
+        if (storedRefreshToken == null)
+        {
+            throw new BusinessException("Refresh Token không hợp lệ.");
+        }
+
+        // 6. Check if already revoked
+        if (storedRefreshToken.IsRevoked)
+        {
+            throw new BusinessException("Refresh Token đã bị thu hồi.");
+        }
+
+        storedRefreshToken.IsRevoked = true;
+        storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+    }
 }

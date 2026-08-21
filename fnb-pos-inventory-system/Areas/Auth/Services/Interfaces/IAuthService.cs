@@ -8,5 +8,6 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Interfaces
         Task<VerifyRegisterOtpResponse> VerifyRegisterOtpAsync(VerifyRegisterOtpRequest request);
         Task<LoginResponse> LoginAsync(LoginRequest request);
         Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest request);
+        Task LogoutAsync(LogoutRequest request);
     }
 }
