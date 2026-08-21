@@ -2,5 +2,8 @@
 {
     public class ResendOtpRequest
     {
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        public string Purpose { get; set; } = string.Empty;
     }
 }
