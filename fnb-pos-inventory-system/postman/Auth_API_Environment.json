@@ -1,0 +1,67 @@
+{
+	"id": "b9876543-21fe-4321-0987-654321fedcba",
+	"name": "FnB POS - Local Environment",
+	"values": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5018",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "testPhoneNumber",
+			"value": "0988776655",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "testPassword",
+			"value": "Password123!",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "newPassword",
+			"value": "NewPassword123!",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "registerOtp",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "forgotOtp",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "resetToken",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment"
+}

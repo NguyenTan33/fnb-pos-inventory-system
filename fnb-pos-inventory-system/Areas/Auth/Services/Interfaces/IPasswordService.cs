@@ -11,5 +11,5 @@ public interface IPasswordService
     Task ResetPasswordAsync(ResetPasswordRequest request);
 
     // Change password for logged-in account
-    Task ChangePasswordAsync(ChangePasswordRequest request);
+    Task ChangePasswordAsync(string accountId, ChangePasswordRequest request);
 }

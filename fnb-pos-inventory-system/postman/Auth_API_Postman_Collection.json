@@ -1,0 +1,466 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-123456789012",
+		"name": "FnB POS - Auth API Test Collection",
+		"description": "Bộ Postman Collection kiểm thử toàn bộ API Phân hệ Authentication & Authorization cho FnB POS & Inventory System.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Luồng Đăng ký & Xác thực",
+			"item": [
+				{
+					"name": "1.1 Register Account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 201 Created', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.message) {",
+									"    var match = jsonData.message.match(/Mã OTP là:\\s*(\\d+)/);",
+									"    if (match && match[1]) {",
+									"        pm.environment.set('registerOtp', match[1]);",
+									"        console.log('Saved registerOtp:', match[1]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Tester QA\",\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"register"
+							]
+						}
+					}
+				},
+				{
+					"name": "1.2 Verify Register OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"otp\": \"{{registerOtp}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/verify-otp",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"verify-otp"
+							]
+						}
+					}
+				},
+				{
+					"name": "1.3 Resend OTP (Register)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Resend OTP Success or Rate Limited', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"purpose\": \"Register\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/resend-otp",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"resend-otp"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Luồng Đăng nhập, Refresh Token & Logout",
+			"item": [
+				{
+					"name": "2.1 Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.accessToken) {",
+									"    pm.environment.set('accessToken', jsonData.accessToken);",
+									"}",
+									"if (jsonData.refreshToken) {",
+									"    pm.environment.set('refreshToken', jsonData.refreshToken);",
+									"}",
+									"if (jsonData.userId) {",
+									"    pm.environment.set('userId', jsonData.userId);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "2.2 Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.accessToken) {",
+									"    pm.environment.set('accessToken', jsonData.accessToken);",
+									"}",
+									"if (jsonData.refreshToken) {",
+									"    pm.environment.set('refreshToken', jsonData.refreshToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"refresh"
+							]
+						}
+					}
+				},
+				{
+					"name": "2.3 Change Password (Authenticated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"{{userId}}\",\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/change-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"change-password"
+							]
+						}
+					}
+				},
+				{
+					"name": "2.4 Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"logout"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Luồng Quên Mật Khẩu & Reset Password",
+			"item": [
+				{
+					"name": "3.1 Forgot Password Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.message) {",
+									"    var match = jsonData.message.match(/Mã OTP là:\\s*(\\d+)/);",
+									"    if (match && match[1]) {",
+									"        pm.environment.set('forgotOtp', match[1]);",
+									"        console.log('Saved forgotOtp:', match[1]);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/forgot-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"forgot-password"
+							]
+						}
+					}
+				},
+				{
+					"name": "3.2 Verify Forgot Password OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.resetToken) {",
+									"    pm.environment.set('resetToken', jsonData.resetToken);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"otp\": \"{{forgotOtp}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/verify-forgot-password-otp",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"verify-forgot-password-otp"
+							]
+						}
+					}
+				},
+				{
+					"name": "3.3 Reset Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"{{testPhoneNumber}}\",\n  \"resetToken\": \"{{resetToken}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/reset-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"reset-password"
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}

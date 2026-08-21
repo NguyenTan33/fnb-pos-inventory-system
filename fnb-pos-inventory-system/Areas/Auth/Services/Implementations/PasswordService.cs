@@ -96,7 +96,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
             }
         }
 
-        public async Task ChangePasswordAsync(ChangePasswordRequest request)
+        public async Task ChangePasswordAsync(string accountId, ChangePasswordRequest request)
         {
             // 1. Validate inputs
             if (string.IsNullOrWhiteSpace(request.AccountId))
