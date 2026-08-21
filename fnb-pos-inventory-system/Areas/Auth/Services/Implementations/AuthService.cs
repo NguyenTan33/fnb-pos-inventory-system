@@ -112,7 +112,8 @@ public class AuthService : IAuthService
             OtpHash = otpHash,
             ExpiresAt = DateTime.UtcNow.AddMinutes(5),
             FailedAttempts = 0,
-            IsUsed = false
+            IsUsed = false,
+            Purpose = "Register"
         };
 
         // 10. Save OTP verification to database
@@ -152,7 +153,7 @@ public class AuthService : IAuthService
         }
 
         // 3. Find the latest unused OTP verification
-        var otpVerification = await _context.OtpVerifications.Where(x => x.PhoneNumber == phoneNumber && !x.IsUsed).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+        var otpVerification = await _context.OtpVerifications.Where(x => x.PhoneNumber == phoneNumber && !x.IsUsed  && x.Purpose == "Register").OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
 
         // 4. Check if OTP verification record exists
         if (otpVerification == null)
@@ -432,5 +433,194 @@ public class AuthService : IAuthService
         storedRefreshToken.RevokedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        // Normalize phone number
+        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+
+        // Validate phone number
+        if (!_phoneService.IsValid(phoneNumber))
+        {
+            throw new BusinessException("Số điện thoại không hợp lệ.");
+        }
+
+        // Find account by phone number
+        var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+
+        // Check if account exists
+        if (account == null)
+        {
+            throw new BusinessException("Nếu số điện thoại được đăng ký, mã xác thực sẽ được gửi.");
+        }
+
+        // Generate 6-digit OTP
+        var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+
+        // Hash OTP before storing it
+        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
+
+        // Hash the OTP
+        var otpHash = _hashService.Hash(otp, otpSecret);
+
+        //  Create OTP verification record
+        var otpVerification = new OtpVerification
+        {
+            PhoneNumber = phoneNumber,
+            OtpHash = otpHash,
+
+            Purpose = "ForgotPassword",
+
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            FailedAttempts = 0,
+            IsUsed = false
+        };
+
+        _context.OtpVerifications.Add(otpVerification);
+
+        await _context.SaveChangesAsync();
+
+        await _smsService.SendOtpAsync(phoneNumber,otp);
+
+        return new ForgotPasswordResponse
+        {
+            Message = "Nếu số điện thoại được đăng ký, mã xác thực sẽ được gửi.",
+            Otp = otp
+        };
+    }
+
+    public async Task<VerifyForgotPasswordOtpResponse> VerifyForgotPasswordOtpAsync(VerifyForgotPasswordOtpRequest request)
+    {
+        // 1. Normalize phone number
+        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+
+        // 2. Validate phone number
+        if (!_phoneService.IsValid(phoneNumber))
+        {
+            throw new BusinessException(
+                "Số điện thoại không hợp lệ.");
+        }
+
+        // 3. Find account
+        var account = await _userManager.Users
+            .FirstOrDefaultAsync(
+                x => x.PhoneNumber == phoneNumber);
+
+        if (account == null)
+        {
+            throw new BusinessException(
+                "Tài khoản không tồn tại.");
+        }
+
+        // 4. Find latest ForgotPassword OTP
+        var otpVerification = await _context.OtpVerifications
+            .Where(x =>
+                x.PhoneNumber == phoneNumber &&
+                !x.IsUsed &&
+                x.Purpose == "ForgotPassword")
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (otpVerification == null)
+        {
+            throw new BusinessException(
+                "Mã OTP không tồn tại hoặc đã được sử dụng.");
+        }
+
+        // 5. Check expiration
+        if (DateTime.UtcNow > otpVerification.ExpiresAt)
+        {
+            throw new BusinessException(
+                "Mã OTP đã hết hạn.");
+        }
+
+        // 6. Check failed attempts
+        if (otpVerification.FailedAttempts >= 5)
+        {
+            throw new BusinessException(
+                "Mã OTP đã bị khóa.");
+        }
+
+        // 7. Get OTP secret
+        var otpSecret =
+            _configuration["Otp:Secret"]
+            ?? throw new InvalidOperationException(
+                "OTP Secret chưa được cấu hình.");
+
+        // 8. Verify OTP
+        if (!_hashService.Verify(
+            request.Otp,
+            otpVerification.OtpHash,
+            otpSecret))
+        {
+            otpVerification.FailedAttempts++;
+
+            await _context.SaveChangesAsync();
+
+            throw new BusinessException(
+                "Mã OTP không hợp lệ.");
+        }
+
+        // 9. Mark OTP as used
+        otpVerification.IsUsed = true;
+
+        await _context.SaveChangesAsync();
+
+        // 10. Generate Identity password reset token
+        var resetToken =await _userManager.GeneratePasswordResetTokenAsync(account);
+
+        // 11. Return reset authorization
+        return new VerifyForgotPasswordOtpResponse
+        {
+            ResetToken = resetToken,
+            UserId = account.Id,
+        };
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        // 1. Normalize phone number
+        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+
+        // 2. Validate phone number
+        if (!_phoneService.IsValid(phoneNumber))
+        {
+            throw new BusinessException(
+                "Số điện thoại không hợp lệ.");
+        }
+
+        // 3. Find account
+        if (string.IsNullOrWhiteSpace(request.ResetToken))
+        {
+            throw new BusinessException("Reset Token không hợp lệ.");
+        }
+
+        // 4. Validate new password
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            throw new BusinessException("Mật khẩu mới không được để trống.");
+        }
+
+        // 5. Find account by phone number
+        var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+
+        // 6. Check if account exists
+        if (account == null)
+        {
+            throw new BusinessException("Yêu cầu đặt lại mật khẩu không hợp lệ.");
+        }
+
+        var result = await _userManager.ResetPasswordAsync( account, request.ResetToken,request.NewPassword);
+
+        // 7. Check result
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ",result.Errors.Select(e => e.Description));
+
+            throw new BusinessException(errors);
+        }
+
+
     }
 }

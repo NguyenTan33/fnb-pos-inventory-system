@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Azure;
 using fnb_pos_inventory_system.Areas.Auth.DTOs;
 using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 namespace fnb_pos_inventory_system.Areas.Auth.Controllers
 {
@@ -81,6 +82,37 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             {
                 message = "Đăng xuất thành công."
             });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            await _authService.ResetPasswordAsync(request);
+
+            return Ok(new
+            {
+                message = "Đặt lại mật khẩu thành công."
+            });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            var response = await _authService.ForgotPasswordAsync(request);
+
+            return Ok(response);
+        }
+
+        [AllowAnonymous]
+        [HttpPost("verify-forgot-password-otp")]
+        public async Task<IActionResult> VerifyForgotPasswordOtp([FromBody] VerifyForgotPasswordOtpRequest request)
+        {
+            var response =
+                await _authService.VerifyForgotPasswordOtpAsync(request);
+
+            return Ok(response);
         }
     }
 }
