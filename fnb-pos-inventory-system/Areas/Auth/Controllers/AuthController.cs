@@ -60,5 +60,15 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
         {
             return Ok("Bạn có role User.");
         }
+
+        [AllowAnonymous]
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            var response = await _authService.RefreshTokenAsync(request);
+
+            return Ok(response);
+        }
     }
 }

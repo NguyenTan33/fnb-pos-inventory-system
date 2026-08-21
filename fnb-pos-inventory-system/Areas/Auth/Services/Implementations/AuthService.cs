@@ -275,14 +275,127 @@ public class AuthService : IAuthService
 
         await _context.SaveChangesAsync();
 
+        var accessTokenExpireMinutes = int.Parse(_configuration["Jwt:ExpireMinutes"] ?? "60");
+
         var response = new LoginResponse
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(60)
+            ExpiresAt = DateTime.UtcNow.AddMinutes(accessTokenExpireMinutes)
         };
 
         return response;
     }
 
+
+    public async Task<RefreshTokenResponse> RefreshTokenAsync(
+    RefreshTokenRequest request)
+    {
+        // 1. Validate refresh token
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            throw new BusinessException(
+                "Refresh Token không hợp lệ.");
+        }
+
+        // 2. Get refresh token secret
+        var refreshTokenSecret =
+            _configuration["RefreshToken:Secret"]
+            ?? throw new InvalidOperationException(
+                "Refresh Token Secret chưa được cấu hình.");
+
+        // 3. Hash provided refresh token
+        var refreshTokenHash =
+            _hashService.Hash(
+                request.RefreshToken,
+                refreshTokenSecret);
+
+        // 4. Find stored refresh token
+        var storedRefreshToken =
+            await _context.RefreshTokens
+                .FirstOrDefaultAsync(
+                    x => x.TokenHash == refreshTokenHash);
+
+        // 5. Check existence
+        if (storedRefreshToken == null)
+        {
+            throw new BusinessException(
+                "Refresh Token không hợp lệ.");
+        }
+
+        // 6. Check revoked
+        if (storedRefreshToken.IsRevoked)
+        {
+            throw new BusinessException(
+                "Refresh Token đã bị thu hồi.");
+        }
+
+        // 7. Check expiration
+        if (DateTime.UtcNow > storedRefreshToken.ExpiresAt)
+        {
+            throw new BusinessException(
+                "Refresh Token đã hết hạn.");
+        }
+
+        // 8. Find account
+        var account = await _userManager.FindByIdAsync(
+            storedRefreshToken.AccountId);
+
+        if (account == null)
+        {
+            throw new BusinessException(
+                "Tài khoản không tồn tại.");
+        }
+
+        // 9. Revoke old refresh token
+        storedRefreshToken.IsRevoked = true;
+        storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+        // 10. Generate new access token
+        var newAccessToken =
+            await _tokenService.GenerateAccessTokenAsync(account);
+
+        // 11. Generate new refresh token
+        var newRefreshToken =
+            _tokenService.GenerateRefreshToken();
+
+        // 12. Hash new refresh token
+        var newRefreshTokenHash =
+            _hashService.Hash(
+                newRefreshToken,
+                refreshTokenSecret);
+
+        // 13. Get refresh token lifetime
+        var refreshTokenExpireDays = int.Parse(
+            _configuration["RefreshToken:ExpireDays"] ?? "7");
+
+        // 14. Create new refresh token entity
+        var newRefreshTokenEntity = new RefreshToken
+        {
+            AccountId = account.Id,
+            TokenHash = newRefreshTokenHash,
+            ExpiresAt = DateTime.UtcNow.AddDays(
+                refreshTokenExpireDays),
+            IsRevoked = false
+        };
+
+        // 15. Save old revoke state + new token
+        _context.RefreshTokens.Add(
+            newRefreshTokenEntity);
+
+        await _context.SaveChangesAsync();
+
+        // 16. Get access token lifetime
+        var accessTokenExpireMinutes = int.Parse(
+            _configuration["Jwt:ExpireMinutes"] ?? "60");
+
+        // 17. Return rotated token pair
+        return new RefreshTokenResponse
+        {
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(
+                accessTokenExpireMinutes)
+        };
+    }
 }
