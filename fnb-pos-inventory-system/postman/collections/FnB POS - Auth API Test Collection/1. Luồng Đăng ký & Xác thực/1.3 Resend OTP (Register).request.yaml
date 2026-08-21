@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/Auth/resend-otp"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "phoneNumber": "{{testPhoneNumber}}",
+      "purpose": "Register"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Resend OTP Success or Rate Limited', function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 429]);
+      });
+    language: text/javascript
+order: 3000

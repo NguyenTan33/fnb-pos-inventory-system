@@ -1,0 +1,29 @@
+$kind: http-request
+url: "{{baseUrl}}/api/Auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "fullName": "Tester QA",
+      "phoneNumber": "{{testPhoneNumber}}",
+      "password": "{{testPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 201 Created', function () {
+          pm.response.to.have.status(201);
+      });
+      var jsonData = pm.response.json();
+      if (jsonData.message) {
+          var match = jsonData.message.match(/Mã OTP là:\s*(\d+)/);
+          if (match && match[1]) {
+              pm.environment.set('registerOtp', match[1]);
+              console.log('Saved registerOtp:', match[1]);
+          }
+      }
+    language: text/javascript
+order: 1000

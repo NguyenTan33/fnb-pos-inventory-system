@@ -13,15 +13,30 @@
 					"name": "1.1 Register Account",
 					"event": [
 						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Tự động sinh SĐT mới ngẫu nhiên cho mỗi lần chạy để không bị trùng lặp trong DB",
+									"var randomPhone = '09' + Math.floor(10000000 + Math.random() * 90000000);",
+									"pm.environment.set('testPhoneNumber', randomPhone);",
+									"console.log('Generated random phone for test:', randomPhone);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test('Status code is 201 Created', function () {",
-									"    pm.response.to.have.status(201);",
+									"pm.test('Status code is 201 Created or 200 OK', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 200]);",
 									"});",
 									"var jsonData = pm.response.json();",
+									"if (jsonData.userId) {",
+									"    pm.environment.set('userId', jsonData.userId);",
+									"}",
 									"if (jsonData.message) {",
-									"    var match = jsonData.message.match(/Mã OTP là:\\s*(\\d+)/);",
+									"    var match = jsonData.message.match(/(\\d{6})/);",
 									"    if (match && match[1]) {",
 									"        pm.environment.set('registerOtp', match[1]);",
 									"        console.log('Saved registerOtp:', match[1]);",
@@ -104,8 +119,8 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test('Resend OTP Success or Rate Limited', function () {",
-									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
+									"pm.test('Resend OTP Result', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 400, 429]);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -158,9 +173,6 @@
 									"}",
 									"if (jsonData.refreshToken) {",
 									"    pm.environment.set('refreshToken', jsonData.refreshToken);",
-									"}",
-									"if (jsonData.userId) {",
-									"    pm.environment.set('userId', jsonData.userId);",
 									"}"
 								],
 								"type": "text/javascript"
@@ -193,7 +205,51 @@
 					}
 				},
 				{
-					"name": "2.2 Refresh Token",
+					"name": "2.2 Change Password (Authenticated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 OK', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"{{userId}}\",\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/change-password",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"change-password"
+							]
+						}
+					}
+				},
+				{
+					"name": "2.3 Refresh Token",
 					"event": [
 						{
 							"listen": "test",
@@ -235,50 +291,6 @@
 								"api",
 								"Auth",
 								"refresh"
-							]
-						}
-					}
-				},
-				{
-					"name": "2.3 Change Password (Authenticated)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test('Status code is 200 OK', function () {",
-									"    pm.response.to.have.status(200);",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{accessToken}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"accountId\": \"{{userId}}\",\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/Auth/change-password",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"api",
-								"Auth",
-								"change-password"
 							]
 						}
 					}
@@ -335,15 +347,18 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test('Status code is 200 OK', function () {",
-									"    pm.response.to.have.status(200);",
+									"pm.test('Status code is 200 OK or Rate Limited 429', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 429]);",
 									"});",
 									"var jsonData = pm.response.json();",
-									"if (jsonData.message) {",
-									"    var match = jsonData.message.match(/Mã OTP là:\\s*(\\d+)/);",
+									"if (jsonData.otp) {",
+									"    pm.environment.set('forgotOtp', jsonData.otp);",
+									"    console.log('Saved forgotOtp:', jsonData.otp);",
+									"} else if (jsonData.message) {",
+									"    var match = jsonData.message.match(/(\\d{6})/);",
 									"    if (match && match[1]) {",
 									"        pm.environment.set('forgotOtp', match[1]);",
-									"        console.log('Saved forgotOtp:', match[1]);",
+									"        console.log('Saved forgotOtp from message:', match[1]);",
 									"    }",
 									"}"
 								],

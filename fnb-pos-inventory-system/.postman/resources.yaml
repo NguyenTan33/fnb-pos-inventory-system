@@ -1,0 +1,13 @@
+# Use this workspace to collaborate
+workspace:
+  id: a8ada5c9-c5f2-4f5a-87a4-64ad460f6c0a
+
+cloudResources:
+  collections:
+    ../postman/collections/FnB POS - Auth API Test Collection: c8a035db-e3d8-4b70-88f2-411e584f16a9
+
+# All resources in the `postman/` folder are automatically registered in Local View.
+# Point to additional files outside the `postman/` folder to register them individually. Example:
+#localResources:
+#  collections:
+#    - ../tests/E2E Test Collection/

@@ -30,10 +30,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             _tokenService = tokenService;
         }
 
-        // =====================================================
         // REGISTER
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("AuthPolicy")]
         [HttpPost("register")]
@@ -49,10 +46,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
                 response);
         }
 
-        // =====================================================
         // VERIFY REGISTER OTP
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("VerifyOtpPolicy")]
         [HttpPost("verify-otp")]
@@ -65,10 +59,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // LOGIN
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("AuthPolicy")]
         [HttpPost("login")]
@@ -81,10 +72,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // REFRESH TOKEN
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("AuthPolicy")]
         [HttpPost("refresh")]
@@ -97,10 +85,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // LOGOUT
-        // =====================================================
-
         [AllowAnonymous]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout(
@@ -114,11 +99,8 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             });
         }
 
-        // =====================================================
         // FORGOT PASSWORD
         // SEND OTP
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("SendOtpPolicy")]
         [HttpPost("forgot-password")]
@@ -131,10 +113,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // VERIFY FORGOT PASSWORD OTP
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("VerifyOtpPolicy")]
         [HttpPost("verify-forgot-password-otp")]
@@ -147,10 +126,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // RESET PASSWORD
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("AuthPolicy")]
         [HttpPost("reset-password")]
@@ -165,10 +141,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             });
         }
 
-        // =====================================================
         // RESEND OTP
-        // =====================================================
-
         [AllowAnonymous]
         [EnableRateLimiting("SendOtpPolicy")]
         [HttpPost("resend-otp")]
@@ -181,10 +154,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        // =====================================================
         // CHANGE PASSWORD
-        // =====================================================
-
         [Authorize]
         [EnableRateLimiting("AuthPolicy")]
         [HttpPost("change-password")]

@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/api/Auth/verify-otp"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "phoneNumber": "{{testPhoneNumber}}",
+      "otp": "{{registerOtp}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200 OK', function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 2000

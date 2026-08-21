@@ -1,0 +1,30 @@
+$kind: http-request
+url: "{{baseUrl}}/api/Auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "phoneNumber": "{{testPhoneNumber}}",
+      "password": "{{testPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200 OK', function () {
+          pm.response.to.have.status(200);
+      });
+      var jsonData = pm.response.json();
+      if (jsonData.accessToken) {
+          pm.environment.set('accessToken', jsonData.accessToken);
+      }
+      if (jsonData.refreshToken) {
+          pm.environment.set('refreshToken', jsonData.refreshToken);
+      }
+      if (jsonData.userId) {
+          pm.environment.set('userId', jsonData.userId);
+      }
+    language: text/javascript
+order: 1000

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using fnb_pos_inventory_system.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -125,6 +126,9 @@ builder.Services.AddScoped<IHashService, HashService>();
 
 var app = builder.Build();
 
+// Global Exception Handling
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 // Seed roles
 using (var scope = app.Services.CreateScope())
 {
@@ -161,6 +165,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+
 // Swagger
 if (app.Environment.IsDevelopment())
 {
@@ -168,10 +173,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseRouting();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseRateLimiter();
 
 app.MapControllers();
 
