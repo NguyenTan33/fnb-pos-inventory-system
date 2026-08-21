@@ -4,7 +4,6 @@ using fnb_pos_inventory_system.Entities;
 using fnb_pos_inventory_system.Exceptions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
 
 namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations;
 
@@ -14,17 +13,23 @@ public class AuthService : IAuthService
     private readonly UserManager<Account> _userManager;
     private readonly IPhoneService _phoneService;
     private readonly ISmsService _smsService;
+
+    // HashService vẫn cần cho Refresh Token
     private readonly IHashService _hashService;
+
+    // OtpService chịu trách nhiệm toàn bộ logic OTP
+    private readonly IOtpService _otpService;
+
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IConfiguration _configuration;
 
-    // Constructor
     public AuthService(
         UserManager<Account> userManager,
         IPhoneService phoneService,
         ISmsService smsService,
-        IHashService HashService,
+        IHashService hashService,
+        IOtpService otpService,
         ITokenService tokenService,
         ApplicationDbContext context,
         IConfiguration configuration)
@@ -32,16 +37,17 @@ public class AuthService : IAuthService
         _userManager = userManager;
         _phoneService = phoneService;
         _smsService = smsService;
-        _hashService = HashService;
-        _context = context;
+        _hashService = hashService;
+        _otpService = otpService;
         _tokenService = tokenService;
+        _context = context;
         _configuration = configuration;
     }
-
-    public async Task<RegisterResponse> RegisterAsync(RegisterRequest request)
+    public async Task<RegisterResponse> RegisterAsync (RegisterRequest request)
     {
         // 1. Normalize phone number
-        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+        var phoneNumber =
+            _phoneService.Normalize(request.PhoneNumber);
 
         // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
@@ -50,8 +56,7 @@ public class AuthService : IAuthService
         }
 
         // 3. Check if phone number already exists
-        var existingUser = await _userManager.Users
-            .FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+        var existingUser = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
 
         if (existingUser != null)
         {
@@ -67,84 +72,54 @@ public class AuthService : IAuthService
             PhoneNumberConfirmed = false
         };
 
-        // 5. Create account using Identity
-        var result = await _userManager.CreateAsync(
-            account,
-            request.Password);
+        // 5. Create account using ASP.NET Core Identity
+        var result = await _userManager.CreateAsync( account, request.Password);
 
         // 6. Check account creation result
         if (!result.Succeeded)
         {
-            var errors = string.Join(
-                ", ",
-                result.Errors.Select(e => e.Description));
+            var errors = string.Join(", ",result.Errors.Select(e => e.Description));
 
             throw new BusinessException(errors);
         }
 
-
-        // Assign "User" role to the newly created account
-        var roleResult = await _userManager.AddToRoleAsync(account, "User");
+        // 7. Assign default User role
+        var roleResult =
+            await _userManager.AddToRoleAsync(account, "User");
 
         if (!roleResult.Succeeded)
         {
-            var errors = string.Join(
-                ", ",
-                roleResult.Errors.Select(e => e.Description));
+            var errors = string.Join(", ", roleResult.Errors.Select( e => e.Description));
 
             throw new BusinessException(errors);
         }
 
-        // 7. Generate 6-digit OTP
-        var otp = RandomNumberGenerator
-            .GetInt32(100000, 1000000)
-            .ToString();
+        // 8. Generate and save Register OTP
+        // OtpService tự xử lý:
+        // - Random OTP
+        // - Hash OTP
+        // - ExpiresAt
+        // - FailedAttempts
+        // - Purpose
+        // - Save database
+        var otp = await _otpService.GenerateAndSaveOtpAsync(phoneNumber, "Register");
 
-        // 8. Hash OTP before storing it
-        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
+        // 9. Send OTP
+        await _smsService.SendOtpAsync(phoneNumber, otp);
 
-        var otpHash = _hashService.Hash(otp, otpSecret);
-
-        // 9. Create OTP verification record
-        var otpVerification = new OtpVerification
-        {
-            PhoneNumber = phoneNumber,
-            OtpHash = otpHash,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-            FailedAttempts = 0,
-            IsUsed = false,
-            Purpose = "Register"
-        };
-
-        // 10. Save OTP verification to database
-        _context.OtpVerifications.Add(otpVerification);
-
-        await _context.SaveChangesAsync();
-
-        // 11. Send OTP via SMS
-        await _smsService.SendOtpAsync(
-            phoneNumber,
-            otp);
-
-        // 12. Return response
-        var response = new RegisterResponse
+        // 10. Return response
+        // Otp chỉ nên trả trong Development để test
+        return new RegisterResponse
         {
             Message = $"Đăng ký thành công. Mã OTP là: {otp}",
             UserId = account.Id
-            //FullName = account.FullName,
-            //PhoneNumber = account.PhoneNumber,
-            //UserId = account.Id
         };
-
-        return response;
     }
 
-
-    // Verify Register OTP
-    public async Task<VerifyRegisterOtpResponse> VerifyRegisterOtpAsync(VerifyRegisterOtpRequest request)
+    public async Task<VerifyRegisterOtpResponse> VerifyRegisterOtpAsync (VerifyRegisterOtpRequest request)
     {
         // 1. Normalize phone number
-        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+        var phoneNumber =_phoneService.Normalize(request.PhoneNumber);
 
         // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
@@ -152,62 +127,32 @@ public class AuthService : IAuthService
             throw new BusinessException("Số điện thoại không hợp lệ.");
         }
 
-        // 3. Find the latest unused OTP verification
-        var otpVerification = await _context.OtpVerifications.Where(x => x.PhoneNumber == phoneNumber && !x.IsUsed  && x.Purpose == "Register").OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
+        // 3. Validate Register OTP
+        // OtpService tự xử lý:
+        // - tìm OTP mới nhất
+        // - IsUsed
+        // - Purpose
+        // - ExpiresAt
+        // - FailedAttempts
+        // - Hash verification
+        // - đánh dấu IsUsed = true
+        await _otpService.ValidateOtpAsync(phoneNumber, request.Otp, "Register");
 
-        // 4. Check if OTP verification record exists
-        if (otpVerification == null)
-        {
-            throw new BusinessException("Mã OTP không tồn tại hoặc đã được sử dụng.");
-        }
-
-        // 5. Check if OTP is expired
-        if (DateTime.UtcNow > otpVerification.ExpiresAt)
-        {
-            throw new BusinessException("Mã OTP đã hết hạn.");
-        }
-
-        // 6. Check if OTP is locked due to too many failed attempts
-        if (otpVerification.FailedAttempts >= 5)
-        {
-            throw new BusinessException("Mã OTP đã bị khóa.");
-        }
-
-        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
-
-        // 7. Verify OTP
-        if (!_hashService.Verify(
-            request.Otp,
-            otpVerification.OtpHash,
-            otpSecret))
-        {
-            otpVerification.FailedAttempts++;
-
-            await _context.SaveChangesAsync();
-
-            throw new BusinessException(
-                "Mã OTP không hợp lệ.");
-        }
-
-        // 8. Save changes to OTP verification record
+        // 4. Find account
         var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
 
-        // 9. Check if account exists
         if (account == null)
         {
             throw new BusinessException("Tài khoản không tồn tại.");
         }
 
-        // Mark OTP as used
-        otpVerification.IsUsed = true;
-
-        // 10. Confirm phone number
+        // 5. Confirm phone number
         account.PhoneNumberConfirmed = true;
 
-        // 11. Save changes to account
+        // 6. Save account changes
         await _context.SaveChangesAsync();
 
-        // Return response
+        // 7. Return response
         return new VerifyRegisterOtpResponse
         {
             Message = "Xác thực số điện thoại thành công.",
@@ -217,272 +162,236 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
-        // Normalize phone number
+        // 1. Normalize phone number
         var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
-       
-        // Validate phone number
+
+        // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
         {
             throw new BusinessException("Số điện thoại không hợp lệ.");
         }
 
-        //  Find account by phone number
+        // 3. Find account
         var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
 
-        // Check if account exists and password is correct
         if (account == null)
         {
             throw new BusinessException("Số điện thoại hoặc mật khẩu không chính xác.");
         }
 
-        // Check if phone number is confirmed
-        if (!account.PhoneNumberConfirmed) 
+        // 4. Check phone verification
+        if (!account.PhoneNumberConfirmed)
         {
             throw new BusinessException("Số điện thoại chưa được xác thực.");
         }
 
-        // Check if password is correct
-        var isPasswordValid = await _userManager.CheckPasswordAsync(account, request.Password);
+        // 5. Check password
+        var isPasswordValid =
+            await _userManager.CheckPasswordAsync(account, request.Password);
 
-        // If password is not valid, throw an exception
         if (!isPasswordValid)
         {
             throw new BusinessException("Số điện thoại hoặc mật khẩu không chính xác.");
         }
 
-        // Generate access token
-        var accessToken =await _tokenService.GenerateAccessTokenAsync(account);
+        // 6. Generate Access Token
+        var accessToken = await _tokenService.GenerateAccessTokenAsync(account);
 
-        // Generate refresh token
+        // 7. Generate Refresh Token
         var refreshToken = _tokenService.GenerateRefreshToken();
 
-        // Store refresh token in database
-        var refreshTokenSecret = _configuration["RefreshToken:Secret"] ?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
+        // 8. Get Refresh Token secret
+        var refreshTokenSecret =
+            _configuration["RefreshToken:Secret"] ?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
 
-        // Hash the refresh token before storing it
+        // 9. Hash Refresh Token before storing
         var refreshTokenHash = _hashService.Hash(refreshToken, refreshTokenSecret);
 
+        // 10. Get Refresh Token expiration
         var refreshTokenExpireDays = int.Parse(_configuration["RefreshToken:ExpireDays"] ?? "7");
 
-        var refreshTokenEntity = new RefreshToken
-        {
-            AccountId = account.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenExpireDays),
-            IsRevoked = false
-        };
+        // 11. Create Refresh Token entity
+        var refreshTokenEntity =
+            new RefreshToken
+            {
+                AccountId = account.Id,
+                TokenHash = refreshTokenHash,
+                ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenExpireDays),
+                IsRevoked = false
+            };
 
+        // 12. Save Refresh Token
         _context.RefreshTokens.Add(refreshTokenEntity);
 
         await _context.SaveChangesAsync();
 
-        var accessTokenExpireMinutes = int.Parse(_configuration["Jwt:ExpireMinutes"] ?? "60");
+        // 13. Get Access Token expiration
+        var accessTokenExpireMinutes =
+            int.Parse(_configuration["Jwt:ExpireMinutes"] ?? "60");
 
-        var response = new LoginResponse
+        // 14. Return token pair
+        return new LoginResponse
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             ExpiresAt = DateTime.UtcNow.AddMinutes(accessTokenExpireMinutes)
         };
-
-        return response;
     }
 
-
-    public async Task<RefreshTokenResponse> RefreshTokenAsync(
-    RefreshTokenRequest request)
+    public async Task<RefreshTokenResponse> RefreshTokenAsync (RefreshTokenRequest request)
     {
-        // 1. Validate refresh token
-        if (string.IsNullOrWhiteSpace(request.RefreshToken))
-        {
-            throw new BusinessException(
-                "Refresh Token không hợp lệ.");
-        }
-
-        // 2. Get refresh token secret
-        var refreshTokenSecret =
-            _configuration["RefreshToken:Secret"]
-            ?? throw new InvalidOperationException(
-                "Refresh Token Secret chưa được cấu hình.");
-
-        // 3. Hash provided refresh token
-        var refreshTokenHash =
-            _hashService.Hash(
-                request.RefreshToken,
-                refreshTokenSecret);
-
-        // 4. Find stored refresh token
-        var storedRefreshToken =
-            await _context.RefreshTokens
-                .FirstOrDefaultAsync(
-                    x => x.TokenHash == refreshTokenHash);
-
-        // 5. Check existence
-        if (storedRefreshToken == null)
-        {
-            throw new BusinessException(
-                "Refresh Token không hợp lệ.");
-        }
-
-        // 6. Check revoked
-        if (storedRefreshToken.IsRevoked)
-        {
-            throw new BusinessException(
-                "Refresh Token đã bị thu hồi.");
-        }
-
-        // 7. Check expiration
-        if (DateTime.UtcNow > storedRefreshToken.ExpiresAt)
-        {
-            throw new BusinessException(
-                "Refresh Token đã hết hạn.");
-        }
-
-        // 8. Find account
-        var account = await _userManager.FindByIdAsync(
-            storedRefreshToken.AccountId);
-
-        if (account == null)
-        {
-            throw new BusinessException(
-                "Tài khoản không tồn tại.");
-        }
-
-        // 9. Revoke old refresh token
-        storedRefreshToken.IsRevoked = true;
-        storedRefreshToken.RevokedAt = DateTime.UtcNow;
-
-        // 10. Generate new access token
-        var newAccessToken =
-            await _tokenService.GenerateAccessTokenAsync(account);
-
-        // 11. Generate new refresh token
-        var newRefreshToken =
-            _tokenService.GenerateRefreshToken();
-
-        // 12. Hash new refresh token
-        var newRefreshTokenHash =
-            _hashService.Hash(
-                newRefreshToken,
-                refreshTokenSecret);
-
-        // 13. Get refresh token lifetime
-        var refreshTokenExpireDays = int.Parse(
-            _configuration["RefreshToken:ExpireDays"] ?? "7");
-
-        // 14. Create new refresh token entity
-        var newRefreshTokenEntity = new RefreshToken
-        {
-            AccountId = account.Id,
-            TokenHash = newRefreshTokenHash,
-            ExpiresAt = DateTime.UtcNow.AddDays(
-                refreshTokenExpireDays),
-            IsRevoked = false
-        };
-
-        // 15. Save old revoke state + new token
-        _context.RefreshTokens.Add(
-            newRefreshTokenEntity);
-
-        await _context.SaveChangesAsync();
-
-        // 16. Get access token lifetime
-        var accessTokenExpireMinutes = int.Parse(
-            _configuration["Jwt:ExpireMinutes"] ?? "60");
-
-        // 17. Return rotated token pair
-        return new RefreshTokenResponse
-        {
-            AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(
-                accessTokenExpireMinutes)
-        };
-    }
-
-    public async Task LogoutAsync(LogoutRequest request)
-    {
-        // 1. Validate refresh token
-        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        // 1. Validate Refresh Token
+        if (string.IsNullOrWhiteSpace(
+            request.RefreshToken))
         {
             throw new BusinessException("Refresh Token không hợp lệ.");
         }
 
-        // 2. Get refresh token secret
-        var refreshTokenSecret =_configuration["RefreshToken:Secret"]?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
+        // 2. Get Refresh Token secret
+        var refreshTokenSecret = _configuration["RefreshToken:Secret"] ?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
 
-        // 3. Hash provided refresh token
-        var refreshTokenHash =_hashService.Hash(request.RefreshToken,refreshTokenSecret);
+        // 3. Hash provided Refresh Token
+        var refreshTokenHash = _hashService.Hash(request.RefreshToken, refreshTokenSecret);
 
-        // 4. Find stored refresh token
-        var storedRefreshToken =await _context.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == refreshTokenHash);
+        // 4. Find Refresh Token in database
+        var storedRefreshToken = await _context.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == refreshTokenHash);
 
-        // 5. Check existence
         if (storedRefreshToken == null)
         {
             throw new BusinessException("Refresh Token không hợp lệ.");
         }
 
-        // 6. Check if already revoked
+        // 5. Check revoked
         if (storedRefreshToken.IsRevoked)
         {
             throw new BusinessException("Refresh Token đã bị thu hồi.");
         }
 
+        // 6. Check expiration
+        if (DateTime.UtcNow > storedRefreshToken.ExpiresAt)
+        {
+            throw new BusinessException("Refresh Token đã hết hạn.");
+        }
+
+        // 7. Find account
+        var account = await _userManager.FindByIdAsync(storedRefreshToken.AccountId);
+
+        if (account == null)
+        {
+            throw new BusinessException("Tài khoản không tồn tại.");
+        }
+
+        // 8. Revoke old Refresh Token
         storedRefreshToken.IsRevoked = true;
         storedRefreshToken.RevokedAt = DateTime.UtcNow;
 
+        // 9. Generate new Access Token
+        var newAccessToken = await _tokenService.GenerateAccessTokenAsync(account);
+
+        // 10. Generate new Refresh Token
+        var newRefreshToken = _tokenService.GenerateRefreshToken();
+
+        // 11. Hash new Refresh Token
+        var newRefreshTokenHash = _hashService.Hash(newRefreshToken,refreshTokenSecret);
+
+        // 12. Get expiration
+        var refreshTokenExpireDays = int.Parse(_configuration["RefreshToken:ExpireDays"] ?? "7");
+
+        // 13. Create new Refresh Token record
+        var newRefreshTokenEntity =
+            new RefreshToken
+            {
+                AccountId = account.Id,
+                TokenHash = newRefreshTokenHash,
+                ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenExpireDays),
+                IsRevoked = false
+            };
+
+        // 14. Save old revoke state + new token
+        _context.RefreshTokens.Add(newRefreshTokenEntity);
+
+        await _context.SaveChangesAsync();
+
+        // 15. Access Token expiration
+        var accessTokenExpireMinutes = int.Parse(_configuration["Jwt:ExpireMinutes"]?? "60");
+
+        // 16. Return rotated token pair
+        return new RefreshTokenResponse
+        {
+            AccessToken =
+                newAccessToken,
+            RefreshToken =
+                newRefreshToken,
+            ExpiresAt =
+                DateTime.UtcNow.AddMinutes(
+                    accessTokenExpireMinutes)
+        };
+    }
+
+    public async Task LogoutAsync(LogoutRequest request)
+    {
+        // 1. Validate Refresh Token
+        if (string.IsNullOrWhiteSpace(
+            request.RefreshToken))
+        {
+            throw new BusinessException("Refresh Token không hợp lệ.");
+        }
+
+        // 2. Get Refresh Token secret
+        var refreshTokenSecret = _configuration["RefreshToken:Secret"] ?? throw new InvalidOperationException("Refresh Token Secret chưa được cấu hình.");
+
+        // 3. Hash provided Refresh Token
+        var refreshTokenHash = _hashService.Hash( request.RefreshToken, refreshTokenSecret);
+
+        // 4. Find Refresh Token
+        var storedRefreshToken = await _context.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == refreshTokenHash);
+
+        if (storedRefreshToken == null)
+        {
+            throw new BusinessException("Refresh Token không hợp lệ.");
+        }
+
+        // 5. Check already revoked
+        if (storedRefreshToken.IsRevoked)
+        {
+            throw new BusinessException("Refresh Token đã bị thu hồi.");
+        }
+
+        // 6. Revoke token
+        storedRefreshToken.IsRevoked = true;
+        storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+        // 7. Save
         await _context.SaveChangesAsync();
     }
 
-    public async Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request)
+    public async Task<ForgotPasswordResponse> ForgotPasswordAsync (ForgotPasswordRequest request)
     {
-        // Normalize phone number
-        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
+        // 1. Normalize phone number
+        var phoneNumber =_phoneService.Normalize(request.PhoneNumber);
 
-        // Validate phone number
+        // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
         {
             throw new BusinessException("Số điện thoại không hợp lệ.");
         }
 
-        // Find account by phone number
-        var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+        // 3. Find account
+        var account =await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
 
-        // Check if account exists
         if (account == null)
         {
             throw new BusinessException("Nếu số điện thoại được đăng ký, mã xác thực sẽ được gửi.");
         }
 
-        // Generate 6-digit OTP
-        var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+        // 4. Generate and save Forgot Password OTP
+        var otp = await _otpService.GenerateAndSaveOtpAsync(phoneNumber,"ForgotPassword");
 
-        // Hash OTP before storing it
-        var otpSecret = _configuration["Otp:Secret"]?? throw new InvalidOperationException("OTP Secret chưa được cấu hình.");
+        // 5. Send OTP
+        await _smsService.SendOtpAsync(phoneNumber, otp);
 
-        // Hash the OTP
-        var otpHash = _hashService.Hash(otp, otpSecret);
-
-        //  Create OTP verification record
-        var otpVerification = new OtpVerification
-        {
-            PhoneNumber = phoneNumber,
-            OtpHash = otpHash,
-
-            Purpose = "ForgotPassword",
-
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
-            FailedAttempts = 0,
-            IsUsed = false
-        };
-
-        _context.OtpVerifications.Add(otpVerification);
-
-        await _context.SaveChangesAsync();
-
-        await _smsService.SendOtpAsync(phoneNumber,otp);
-
+        // 6. Return response
+        // Otp chỉ dùng khi Development
         return new ForgotPasswordResponse
         {
             Message = "Nếu số điện thoại được đăng ký, mã xác thực sẽ được gửi.",
@@ -490,7 +399,7 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<VerifyForgotPasswordOtpResponse> VerifyForgotPasswordOtpAsync(VerifyForgotPasswordOtpRequest request)
+    public async Task<VerifyForgotPasswordOtpResponse> VerifyForgotPasswordOtpAsync (VerifyForgotPasswordOtpRequest request)
     {
         // 1. Normalize phone number
         var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
@@ -498,87 +407,32 @@ public class AuthService : IAuthService
         // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
         {
-            throw new BusinessException(
-                "Số điện thoại không hợp lệ.");
+            throw new BusinessException("Số điện thoại không hợp lệ.");
         }
 
         // 3. Find account
-        var account = await _userManager.Users
-            .FirstOrDefaultAsync(
-                x => x.PhoneNumber == phoneNumber);
+        var account = await _userManager.Users.FirstOrDefaultAsync(x =>x.PhoneNumber == phoneNumber);
 
         if (account == null)
         {
-            throw new BusinessException(
-                "Tài khoản không tồn tại.");
+            throw new BusinessException("Tài khoản không tồn tại.");
         }
 
-        // 4. Find latest ForgotPassword OTP
-        var otpVerification = await _context.OtpVerifications
-            .Where(x =>
-                x.PhoneNumber == phoneNumber &&
-                !x.IsUsed &&
-                x.Purpose == "ForgotPassword")
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync();
+        // 4. Validate Forgot Password OTP
+        await _otpService.ValidateOtpAsync(phoneNumber ,request.Otp, "ForgotPassword");
 
-        if (otpVerification == null)
-        {
-            throw new BusinessException(
-                "Mã OTP không tồn tại hoặc đã được sử dụng.");
-        }
+        // 5. Generate Identity Reset Token
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(account);
 
-        // 5. Check expiration
-        if (DateTime.UtcNow > otpVerification.ExpiresAt)
-        {
-            throw new BusinessException(
-                "Mã OTP đã hết hạn.");
-        }
-
-        // 6. Check failed attempts
-        if (otpVerification.FailedAttempts >= 5)
-        {
-            throw new BusinessException(
-                "Mã OTP đã bị khóa.");
-        }
-
-        // 7. Get OTP secret
-        var otpSecret =
-            _configuration["Otp:Secret"]
-            ?? throw new InvalidOperationException(
-                "OTP Secret chưa được cấu hình.");
-
-        // 8. Verify OTP
-        if (!_hashService.Verify(
-            request.Otp,
-            otpVerification.OtpHash,
-            otpSecret))
-        {
-            otpVerification.FailedAttempts++;
-
-            await _context.SaveChangesAsync();
-
-            throw new BusinessException(
-                "Mã OTP không hợp lệ.");
-        }
-
-        // 9. Mark OTP as used
-        otpVerification.IsUsed = true;
-
-        await _context.SaveChangesAsync();
-
-        // 10. Generate Identity password reset token
-        var resetToken =await _userManager.GeneratePasswordResetTokenAsync(account);
-
-        // 11. Return reset authorization
+        // 6. Return Reset Token
         return new VerifyForgotPasswordOtpResponse
         {
-            ResetToken = resetToken,
-            UserId = account.Id,
+            ResetToken = resetToken
         };
     }
 
-    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    public async Task ResetPasswordAsync(
+        ResetPasswordRequest request)
     {
         // 1. Normalize phone number
         var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
@@ -586,11 +440,10 @@ public class AuthService : IAuthService
         // 2. Validate phone number
         if (!_phoneService.IsValid(phoneNumber))
         {
-            throw new BusinessException(
-                "Số điện thoại không hợp lệ.");
+            throw new BusinessException("Số điện thoại không hợp lệ.");
         }
 
-        // 3. Find account
+        // 3. Validate Reset Token
         if (string.IsNullOrWhiteSpace(request.ResetToken))
         {
             throw new BusinessException("Reset Token không hợp lệ.");
@@ -602,25 +455,87 @@ public class AuthService : IAuthService
             throw new BusinessException("Mật khẩu mới không được để trống.");
         }
 
-        // 5. Find account by phone number
-        var account = await _userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber);
+        // 5. Find account
+        var account = await _userManager.Users.FirstOrDefaultAsync(x =>x.PhoneNumber == phoneNumber);
 
-        // 6. Check if account exists
         if (account == null)
         {
             throw new BusinessException("Yêu cầu đặt lại mật khẩu không hợp lệ.");
         }
 
-        var result = await _userManager.ResetPasswordAsync( account, request.ResetToken,request.NewPassword);
+        // 6. Reset password using Identity
+        var result =await _userManager.ResetPasswordAsync(account, request.ResetToken, request.NewPassword);
 
         // 7. Check result
         if (!result.Succeeded)
         {
-            var errors = string.Join(", ",result.Errors.Select(e => e.Description));
+            var errors =string.Join(", ", result.Errors.Select( e => e.Description));
 
             throw new BusinessException(errors);
         }
+    }
 
+    public async Task<ResendOtpResponse> ResendOtpAsync (ResendOtpRequest request)
+    {
+        // 1. Normalize phone number
+        var phoneNumber = _phoneService.Normalize(request.PhoneNumber);
 
+        // 2. Validate phone number
+        if (!_phoneService.IsValid(phoneNumber))
+        {
+            throw new BusinessException("Số điện thoại không hợp lệ.");
+        }
+
+        // 3. Validate OTP purpose
+        if (request.Purpose != "Register" && request.Purpose != "ForgotPassword")
+        {
+            throw new BusinessException("Mục đích OTP không hợp lệ.");
+        }
+
+        // 4. Find account
+        var account = await _userManager.Users.FirstOrDefaultAsync(x =>x.PhoneNumber ==phoneNumber);
+
+        // 5. Register resend validation
+        if (request.Purpose == "Register")
+        {
+            if (account == null)
+            {
+                throw new BusinessException("Tài khoản không tồn tại.");
+            }
+
+            if (account.PhoneNumberConfirmed)
+            {
+                throw new BusinessException("Số điện thoại đã được xác thực.");
+            }
+        }
+
+        // 6. Forgot Password resend validation
+        if (request.Purpose ==
+            "ForgotPassword")
+        {
+            if (account == null)
+            {
+                throw new BusinessException("Tài khoản không tồn tại.");
+            }
+        }
+
+        // 7. Check 60-second cooldown
+        await _otpService.CheckCooldownAsync(phoneNumber, request.Purpose, 60);
+
+        // 8. Invalidate old active OTPs
+        await _otpService.InvalidateActiveOtpsAsync(phoneNumber, request.Purpose);
+
+        // 9. Generate new OTP
+        var otp = await _otpService.GenerateAndSaveOtpAsync(phoneNumber, request.Purpose);
+
+        // 10. Send OTP
+        await _smsService.SendOtpAsync(phoneNumber, otp);
+
+        // 11. Return response
+        return new ResendOtpResponse
+        {
+            Message ="Mã OTP mới đã được gửi.",
+            Otp = otp
+        };
     }
 }
