@@ -4,8 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace fnb_pos_inventory_system;
 
-public class ApplicationDbContext
-    : IdentityDbContext<Account>
+public class ApplicationDbContext : IdentityDbContext<Account>
 {
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options)
@@ -13,16 +12,28 @@ public class ApplicationDbContext
     {
     }
 
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        // Configure ASP.NET Core Identity tables first
+        base.OnModelCreating(builder);
+
+        // Configure RefreshToken -> Account relationship
         builder.Entity<RefreshToken>()
             .HasOne(x => x.Account)
             .WithMany()
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        base.OnModelCreating(builder);
-        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        // Prevent duplicate phone numbers at database level
+        builder.Entity<Account>()
+            .HasIndex(x => x.PhoneNumber)
+            .IsUnique()
+            .HasFilter("[PhoneNumber] IS NOT NULL");
+
+        // Apply IEntityTypeConfiguration classes in this assembly
+        builder.ApplyConfigurationsFromAssembly(
+            typeof(ApplicationDbContext).Assembly);
     }
 
     public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
