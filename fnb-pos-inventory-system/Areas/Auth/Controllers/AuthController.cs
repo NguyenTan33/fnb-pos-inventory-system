@@ -48,22 +48,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
             return Ok(response);
         }
 
-        [Authorize]
-        [HttpGet("test-auth")]
-        public IActionResult TestAuth()
-        {
-            return Ok("JWT hợp lệ.");
-        }
-
-        [Authorize(Roles = "Admin,User")]
-        [HttpGet("test-user-role")]
-        public IActionResult TestUserRole()
-        {
-            return Ok("Bạn có role User.");
-        }
-
         [AllowAnonymous]
-
         [HttpPost("refresh")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
         {
