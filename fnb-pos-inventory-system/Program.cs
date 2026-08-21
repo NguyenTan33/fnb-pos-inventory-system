@@ -1,9 +1,10 @@
-﻿using fnb_pos_inventory_system;
+using fnb_pos_inventory_system;
 using fnb_pos_inventory_system.Areas.Auth.Services.Implementations;
 using fnb_pos_inventory_system.Areas.Auth.Services.Interfaces;
 using fnb_pos_inventory_system.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -82,12 +83,45 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Rate Limiter
+builder.Services.AddRateLimiter(options =>
+{
+    // Login / Register / Refresh...
+    options.AddFixedWindowLimiter("AuthPolicy", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+
+    // Các API thực sự gửi OTP
+    options.AddFixedWindowLimiter("SendOtpPolicy", limiter =>
+    {
+        limiter.PermitLimit = 1;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+
+    // Cho nhập OTP nhiều hơn 1 lần
+    options.AddFixedWindowLimiter("VerifyOtpPolicy", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+    });
+
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+});
+
 // Dependency Injection
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IPasswordService, PasswordService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPhoneService, PhoneService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
 builder.Services.AddScoped<IHashService, HashService>();
-builder.Services.AddScoped<ITokenService, TokenService>();
 
 var app = builder.Build();
 
