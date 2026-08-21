@@ -99,7 +99,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
         public async Task ChangePasswordAsync(string accountId, ChangePasswordRequest request)
         {
             // 1. Validate inputs
-            if (string.IsNullOrWhiteSpace(request.AccountId))
+            if (string.IsNullOrWhiteSpace(accountId))
             {
                 throw new BusinessException("Mã tài khoản không hợp lệ.");
             }
@@ -109,8 +109,8 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
                 throw new BusinessException("Mật khẩu hiện tại và mật khẩu mới không được để trống.");
             }
 
-            // 2. Find account by Id
-            var account = await _userManager.FindByIdAsync(request.AccountId);
+            // 2. Find account by Id (extracted from JWT Claims)
+            var account = await _userManager.FindByIdAsync(accountId);
 
             if (account == null)
             {

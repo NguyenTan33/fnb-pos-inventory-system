@@ -10,6 +10,6 @@ public interface IPasswordService
     // Reset password using Identity Reset Token after OTP verification
     Task ResetPasswordAsync(ResetPasswordRequest request);
 
-    // Change password for logged-in account
+    // Change password for logged-in account using accountId extracted from JWT Token Claims
     Task ChangePasswordAsync(string accountId, ChangePasswordRequest request);
 }
