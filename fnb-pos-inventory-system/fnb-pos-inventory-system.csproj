@@ -15,6 +15,9 @@
     <Compile Remove="Areas\Auth\Models\**" />
     <Compile Remove="Areas\Auth\Views\**" />
     <Compile Remove="Areas\Cashier\**" />
+    <Compile Remove="Areas\Inventory\Data\**" />
+    <Compile Remove="Areas\Inventory\Models\**" />
+    <Compile Remove="Areas\Inventory\Views\**" />
     <Compile Remove="Controllers\**" />
     <Content Remove="Areas\Admin\Data\**" />
     <Content Remove="Areas\Admin\Models\**" />
@@ -23,6 +26,9 @@
     <Content Remove="Areas\Auth\Models\**" />
     <Content Remove="Areas\Auth\Views\**" />
     <Content Remove="Areas\Cashier\**" />
+    <Content Remove="Areas\Inventory\Data\**" />
+    <Content Remove="Areas\Inventory\Models\**" />
+    <Content Remove="Areas\Inventory\Views\**" />
     <Content Remove="Controllers\**" />
     <EmbeddedResource Remove="Areas\Admin\Data\**" />
     <EmbeddedResource Remove="Areas\Admin\Models\**" />
@@ -31,6 +37,9 @@
     <EmbeddedResource Remove="Areas\Auth\Models\**" />
     <EmbeddedResource Remove="Areas\Auth\Views\**" />
     <EmbeddedResource Remove="Areas\Cashier\**" />
+    <EmbeddedResource Remove="Areas\Inventory\Data\**" />
+    <EmbeddedResource Remove="Areas\Inventory\Models\**" />
+    <EmbeddedResource Remove="Areas\Inventory\Views\**" />
     <EmbeddedResource Remove="Controllers\**" />
     <None Remove="Areas\Admin\Data\**" />
     <None Remove="Areas\Admin\Models\**" />
@@ -39,6 +48,9 @@
     <None Remove="Areas\Auth\Models\**" />
     <None Remove="Areas\Auth\Views\**" />
     <None Remove="Areas\Cashier\**" />
+    <None Remove="Areas\Inventory\Data\**" />
+    <None Remove="Areas\Inventory\Models\**" />
+    <None Remove="Areas\Inventory\Views\**" />
     <None Remove="Controllers\**" />
   </ItemGroup>
 
@@ -61,9 +73,6 @@
     <Folder Include="Areas\Customer\Models\" />
     <Folder Include="Areas\Customer\Views\" />
     <Folder Include="Areas\Inventory\Controllers\" />
-    <Folder Include="Areas\Inventory\Data\" />
-    <Folder Include="Areas\Inventory\Models\" />
-    <Folder Include="Areas\Inventory\Views\" />
     <Folder Include="Areas\Kitchen\Controllers\" />
     <Folder Include="Areas\Kitchen\Data\" />
     <Folder Include="Areas\Kitchen\Models\" />
