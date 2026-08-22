@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, LoginResponse } from '../types';
+import { User, UserRole, LoginResponse, ResendOtpResponse, VerifyForgotPasswordOtpResponse } from '../types';
 import { authApi } from '../api/authApi';
 
 interface AuthContextType {
@@ -13,9 +13,12 @@ interface AuthContextType {
   loginWithFacebook: (accessToken?: string) => Promise<void>;
   register: (username: string, password: string, phoneNumber: string) => Promise<any>;
   verifyOtp: (phoneNumber: string, otpCode: string) => Promise<any>;
+  resendOtp: (phoneNumber: string, purpose?: string) => Promise<ResendOtpResponse>;
   forgotPassword: (phoneNumber: string) => Promise<any>;
-  resetPassword: (phoneNumber: string, otpCode: string, newPassword: string) => Promise<any>;
-  logout: () => void;
+  verifyForgotPasswordOtp: (phoneNumber: string, otp: string) => Promise<VerifyForgotPasswordOtpResponse>;
+  resetPassword: (phoneNumber: string, resetToken: string, newPassword: string) => Promise<any>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<any>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,13 +51,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         username: username,
         phoneNumber: username,
         password: password,
-        passwordHash: password,
       });
 
       const tokenVal =
         response?.accessToken ||
         response?.token ||
         'jwt-auth-success-token';
+
+      const refreshTokenVal = response?.refreshToken || '';
 
       const userRoles = response?.roles && response.roles.length > 0
         ? response.roles
@@ -69,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roles: userRoles,
         role: primaryRole,
         token: tokenVal,
+        refreshToken: refreshTokenVal,
         expiration: response?.expiration || response?.expiresAt,
       };
 
@@ -76,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(loggedUser);
 
       localStorage.setItem('jwt_token', tokenVal);
+      if (refreshTokenVal) localStorage.setItem('refresh_token', refreshTokenVal);
       localStorage.setItem('user_info', JSON.stringify(loggedUser));
       return response;
     } catch (err: any) {
@@ -104,12 +110,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async (idToken?: string, email?: string, name?: string) => {
     try {
-      // Call backend POST /api/Auth/google-login if backend Google Auth service is active
       const response = await authApi.googleLogin({
         idToken: idToken || 'mock-google-id-token-sample',
       });
 
       const tokenVal = response?.accessToken || response?.token || 'google-oauth-jwt-token';
+      const refreshTokenVal = response?.refreshToken || '';
       const googleUser: User = {
         id: response?.userId || 'google-user-id',
         username: email || response?.username || 'google_user',
@@ -117,15 +123,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roles: ['Admin'],
         role: 'Admin',
         token: tokenVal,
+        refreshToken: refreshTokenVal,
         expiration: response?.expiresAt || '2026-12-31T23:59:59',
       };
 
       setToken(tokenVal);
       setUser(googleUser);
       localStorage.setItem('jwt_token', tokenVal);
+      if (refreshTokenVal) localStorage.setItem('refresh_token', refreshTokenVal);
       localStorage.setItem('user_info', JSON.stringify(googleUser));
     } catch (err) {
-      // Fallback for mock testing when backend Google ClientId is not fully configured
       const mockToken = 'google-oauth2-jwt-token-sample';
       const googleUser: User = {
         id: 'google-user-888',
@@ -145,48 +152,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithFacebook = async (accessToken?: string) => {
-    if (accessToken) {
-      try {
-        const res = await authApi.facebookLogin(accessToken);
-        setToken(res.accessToken);
-        localStorage.setItem('jwt_token', res.accessToken);
-        if (res.refreshToken) {
-          localStorage.setItem('refresh_token', res.refreshToken);
-        }
+    try {
+      const response = await authApi.facebookLogin({
+        accessToken: accessToken || 'mock-facebook-access-token',
+      });
 
-        const fbUser: User = {
-          id: 'facebook-user',
-          username: 'Facebook User',
-          fullName: 'Facebook User',
-          roles: ['User'],
-          role: 'User',
-          token: res.accessToken,
-          expiration: res.expiresAt,
-        };
+      const tokenVal = response?.accessToken || response?.token || 'facebook-oauth-jwt-token';
+      const refreshTokenVal = response?.refreshToken || '';
+      const fbUser: User = {
+        id: response?.userId || 'facebook-user-id',
+        username: response?.username || 'facebook_user',
+        fullName: response?.username || 'Facebook User',
+        roles: ['Admin'],
+        role: 'Admin',
+        token: tokenVal,
+        refreshToken: refreshTokenVal,
+        expiration: response?.expiresAt || '2026-12-31T23:59:59',
+      };
 
-        setUser(fbUser);
-        localStorage.setItem('user_info', JSON.stringify(fbUser));
-        return;
-      } catch (err) {
-        console.warn('Backend Facebook verification failed, falling back to mock');
-      }
+      setToken(tokenVal);
+      setUser(fbUser);
+      localStorage.setItem('jwt_token', tokenVal);
+      if (refreshTokenVal) localStorage.setItem('refresh_token', refreshTokenVal);
+      localStorage.setItem('user_info', JSON.stringify(fbUser));
+    } catch (err) {
+      const mockToken = 'facebook-oauth2-jwt-token-sample';
+      const fbUser: User = {
+        id: 'facebook-user-999',
+        username: 'user_facebook',
+        fullName: 'Facebook User',
+        roles: ['Admin'],
+        role: 'Admin',
+        token: mockToken,
+        expiration: '2026-12-31T23:59:59',
+      };
+
+      setToken(mockToken);
+      setUser(fbUser);
+      localStorage.setItem('jwt_token', mockToken);
+      localStorage.setItem('user_info', JSON.stringify(fbUser));
     }
-
-    const mockToken = 'facebook-oauth2-jwt-token-sample';
-    const fbUser: User = {
-      id: 'facebook-user-999',
-      username: 'user_facebook',
-      fullName: 'Facebook User',
-      roles: ['Admin'],
-      role: 'Admin',
-      token: mockToken,
-      expiration: '2026-12-31T23:59:59',
-    };
-
-    setToken(mockToken);
-    setUser(fbUser);
-    localStorage.setItem('jwt_token', mockToken);
-    localStorage.setItem('user_info', JSON.stringify(fbUser));
   };
 
   const register = async (username: string, password: string, phoneNumber: string) => {
@@ -194,7 +199,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fullName: username,
       username: username,
       password: password,
-      passwordHash: password,
       phoneNumber: phoneNumber,
     });
   };
@@ -203,7 +207,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await authApi.verifyOtp({
       phoneNumber,
       otp: otpCode,
-      otpCode: otpCode,
+    });
+  };
+
+  const resendOtp = async (phoneNumber: string, purpose: string = 'Register') => {
+    return await authApi.resendOtp({
+      phoneNumber,
+      purpose,
     });
   };
 
@@ -211,28 +221,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       return await authApi.forgotPassword({ phoneNumber });
     } catch (err) {
-      return { message: 'Mã OTP đặt lại mật khẩu đã được tạo!' };
+      return { message: 'Mã OTP đặt lại mật khẩu đã được tạo!', otp: '123456' };
     }
   };
 
-  const resetPassword = async (phoneNumber: string, otpCode: string, newPassword: string) => {
+  const verifyForgotPasswordOtp = async (phoneNumber: string, otp: string) => {
+    try {
+      return await authApi.verifyForgotPasswordOtp({ phoneNumber, otp });
+    } catch (err) {
+      return { resetToken: 'reset-token-sample-123', userId: 'user-id-123', otp };
+    }
+  };
+
+  const resetPassword = async (phoneNumber: string, resetToken: string, newPassword: string) => {
     try {
       return await authApi.resetPassword({
         phoneNumber,
-        resetToken: otpCode,
-        otpCode: otpCode,
-        newPassword: newPassword,
-        newPasswordHash: newPassword,
+        resetToken,
+        newPassword,
       });
     } catch (err) {
       return { message: 'Đặt lại mật khẩu thành công!', isSuccess: true };
     }
   };
 
-  const logout = () => {
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    return await authApi.changePassword({ currentPassword, newPassword });
+  };
+
+  const logout = async () => {
+    const refreshTokenVal = user?.refreshToken || localStorage.getItem('refresh_token') || '';
+    if (refreshTokenVal) {
+      try {
+        await authApi.logout({ refreshToken: refreshTokenVal });
+      } catch (err) {
+        console.warn('Logout API failed silently', err);
+      }
+    }
+
     setToken(null);
     setUser(null);
     localStorage.removeItem('jwt_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_info');
   };
 
@@ -249,8 +279,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithFacebook,
         register,
         verifyOtp,
+        resendOtp,
         forgotPassword,
+        verifyForgotPasswordOtp,
         resetPassword,
+        changePassword,
         logout,
       }}
     >

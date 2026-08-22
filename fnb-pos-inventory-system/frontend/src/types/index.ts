@@ -8,9 +8,11 @@ export interface User {
   roles: string[];
   role?: UserRole;
   token?: string;
+  refreshToken?: string;
   expiration?: string;
 }
 
+// 1. LOGIN DTO
 export interface LoginRequest {
   phoneNumber?: string;
   username?: string;
@@ -30,10 +32,17 @@ export interface LoginResponse {
   message?: string;
 }
 
+// 2. GOOGLE LOGIN DTO
 export interface GoogleLoginRequest {
   idToken: string;
 }
 
+// 3. FACEBOOK LOGIN DTO
+export interface FacebookLoginRequest {
+  accessToken: string;
+}
+
+// 4. REGISTER DTO
 export interface RegisterRequest {
   fullName?: string;
   username?: string;
@@ -50,6 +59,7 @@ export interface RegisterResponse {
   message?: string;
 }
 
+// 5. VERIFY REGISTER OTP DTO
 export interface VerifyRegisterOtpRequest {
   phoneNumber: string;
   otp?: string;
@@ -62,14 +72,29 @@ export interface VerifyRegisterOtpResponse {
   isSuccess?: boolean;
 }
 
+// 6. FORGOT PASSWORD DTO
 export interface ForgotPasswordRequest {
   phoneNumber: string;
 }
 
 export interface ForgotPasswordResponse {
   message?: string;
+  otp?: string;
 }
 
+// 7. VERIFY FORGOT PASSWORD OTP DTO
+export interface VerifyForgotPasswordOtpRequest {
+  phoneNumber: string;
+  otp: string;
+}
+
+export interface VerifyForgotPasswordOtpResponse {
+  resetToken: string;
+  userId?: string;
+  otp?: string;
+}
+
+// 8. RESET PASSWORD DTO
 export interface ResetPasswordRequest {
   phoneNumber: string;
   resetToken?: string;
@@ -81,6 +106,39 @@ export interface ResetPasswordRequest {
 export interface ResetPasswordResponse {
   message?: string;
   isSuccess?: boolean;
+}
+
+// 9. RESEND OTP DTO
+export interface ResendOtpRequest {
+  phoneNumber: string;
+  purpose?: string;
+}
+
+export interface ResendOtpResponse {
+  message?: string;
+  otp?: string;
+}
+
+// 10. REFRESH TOKEN DTO
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
+// 11. LOGOUT DTO
+export interface LogoutRequest {
+  refreshToken: string;
+}
+
+// 12. CHANGE PASSWORD DTO
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Area {

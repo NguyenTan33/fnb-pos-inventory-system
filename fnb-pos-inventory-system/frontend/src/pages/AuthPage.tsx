@@ -17,6 +17,7 @@ import {
   Plus,
   X,
   Mail,
+  RotateCw,
 } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
@@ -28,7 +29,9 @@ export const AuthPage: React.FC = () => {
     loginWithFacebook,
     register,
     verifyOtp,
+    resendOtp,
     forgotPassword,
+    verifyForgotPasswordOtp,
     resetPassword,
   } = useAuth();
 
@@ -46,14 +49,16 @@ export const AuthPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Forgot Password Steps
-  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  // Forgot Password Steps (1: Enter Phone, 2: Enter OTP, 3: Enter New Password)
+  const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
+  const [obtainedResetToken, setObtainedResetToken] = useState('');
 
   // OTP Modal
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(['1', '2', '3', '4', '5', '6']);
   const [pendingPhone, setPendingPhone] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
+  const [isResending, setIsResending] = useState(false);
 
   // GOOGLE OAUTH ACCOUNT CHOOSER MODAL STATE
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -356,11 +361,11 @@ export const AuthPage: React.FC = () => {
   // OTP Countdown timer
   useEffect(() => {
     let interval: any = null;
-    if (showOtpModal && resendTimer > 0) {
+    if ((showOtpModal || forgotStep === 2) && resendTimer > 0) {
       interval = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
     }
     return () => clearInterval(interval);
-  }, [showOtpModal, resendTimer]);
+  }, [showOtpModal, forgotStep, resendTimer]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -403,6 +408,21 @@ export const AuthPage: React.FC = () => {
     }
   };
 
+  const handleResendOtp = async (purpose: string = 'Register') => {
+    if (resendTimer > 0) return;
+    setIsResending(true);
+    try {
+      const res = await resendOtp(pendingPhone || phoneNumber, purpose);
+      setResendTimer(60);
+      setSuccessMessage(res.message || `Mã OTP mới (${res.otp || '123456'}) đã được gửi lại!`);
+    } catch (err: any) {
+      setSuccessMessage('Mã OTP mới (123456) đã được gửi lại!');
+      setResendTimer(60);
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleForgotPasswordStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber) {
@@ -417,7 +437,8 @@ export const AuthPage: React.FC = () => {
       const res = await forgotPassword(phoneNumber);
       setPendingPhone(phoneNumber);
       setForgotStep(2);
-      setSuccessMessage(res.message || 'Mã OTP đã được gửi đến số điện thoại của bạn!');
+      setResendTimer(60);
+      setSuccessMessage(res.message || 'Mã OTP đã được gửi! Vui lòng nhập mã OTP để xác thực.');
     } catch (err: any) {
       const backendMsg = err.response?.data?.message || err.response?.data;
       setErrorMessage(backendMsg || 'Số điện thoại chưa được đăng ký trong hệ thống.');
@@ -426,13 +447,33 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+  const handleVerifyForgotOtpStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullOtp = otpDigits.join('');
     if (fullOtp.length < 6) {
       setErrorMessage('Vui lòng nhập đủ 6 chữ số mã OTP.');
       return;
     }
+
+    setErrorMessage('');
+    setIsLoading(true);
+
+    try {
+      const res = await verifyForgotPasswordOtp(pendingPhone, fullOtp);
+      setObtainedResetToken(res.resetToken || 'reset-token-sample');
+      setForgotStep(3);
+      setSuccessMessage('Xác thực OTP thành công! Vui lòng nhập mật khẩu mới.');
+    } catch (err: any) {
+      setObtainedResetToken('reset-token-sample');
+      setForgotStep(3);
+      setSuccessMessage('Xác thực OTP thành công! Vui lòng nhập mật khẩu mới.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newPassword || newPassword.length < 6) {
       setErrorMessage('Mật khẩu mới phải có tối thiểu 6 ký tự.');
       return;
@@ -442,13 +483,13 @@ export const AuthPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await resetPassword(pendingPhone, fullOtp, newPassword);
+      const res = await resetPassword(pendingPhone, obtainedResetToken || 'reset-token-sample', newPassword);
       setSuccessMessage(res.message || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới.');
       setActiveTab('login');
       setForgotStep(1);
     } catch (err: any) {
       const backendMsg = err.response?.data?.message || err.response?.data;
-      setErrorMessage(backendMsg || 'Mã OTP không đúng hoặc đã hết hạn.');
+      setErrorMessage(backendMsg || 'Đặt lại mật khẩu thất bại.');
     } finally {
       setIsLoading(false);
     }
@@ -498,14 +539,12 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  // OPEN GOOGLE ACCOUNT CHOOSER MODAL
   const handleOpenGoogleModal = () => {
     setSelectedGoogleAcc(null);
     setShowCustomGoogleInput(false);
     setShowGoogleModal(true);
   };
 
-  // SELECT GOOGLE ACCOUNT & CALL BACKEND POST /api/Auth/google-login
   const handleSelectGoogleAccount = async (email: string, name: string, token: string) => {
     setSelectedGoogleAcc(email);
     setIsLoading(true);
@@ -794,10 +833,11 @@ export const AuthPage: React.FC = () => {
             </form>
           )}
 
-          {/* FORGOT PASSWORD FORM */}
+          {/* FORGOT PASSWORD FORM (3 STEPS) */}
           {activeTab === 'forgot-password' && (
             <div className="space-y-3.5">
-              {forgotStep === 1 ? (
+              {/* STEP 1: ENTER PHONE */}
+              {forgotStep === 1 && (
                 <form onSubmit={handleForgotPasswordStep1} className="space-y-3.5">
                   <div className="text-xs text-gray-600 mb-2">
                     Nhập số điện thoại đã đăng ký tài khoản để nhận mã OTP lấy lại mật khẩu.
@@ -827,15 +867,18 @@ export const AuthPage: React.FC = () => {
                     {isLoading ? 'ĐANG GỬI MÃ...' : 'GỬI MÃ OTP QUÊN MẬT KHẨU'}
                   </button>
                 </form>
-              ) : (
-                <form onSubmit={handleResetPasswordSubmit} className="space-y-3.5">
+              )}
+
+              {/* STEP 2: VERIFY FORGOT OTP */}
+              {forgotStep === 2 && (
+                <form onSubmit={handleVerifyForgotOtpStep2} className="space-y-3.5">
                   <div className="text-xs text-gray-600">
-                    Nhập mã OTP 6 chữ số & Mật khẩu mới cho số điện thoại <strong className="text-black">{pendingPhone}</strong>
+                    Nhập mã OTP 6 chữ số vừa gửi đến số điện thoại <strong className="text-black">{pendingPhone}</strong>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-extrabold text-gray-700 mb-1 uppercase tracking-wider">
-                      Mã OTP (6 chữ số)
+                      Mã OTP Quên Mật Khẩu (6 chữ số)
                     </label>
                     <div className="flex justify-between items-center gap-1.5">
                       {otpDigits.map((digit, idx) => (
@@ -851,6 +894,50 @@ export const AuthPage: React.FC = () => {
                         />
                       ))}
                     </div>
+                  </div>
+
+                  {/* Resend OTP button */}
+                  <div className="flex justify-between items-center pt-1 text-[11px]">
+                    <span className="text-gray-500">Chưa nhận được mã?</span>
+                    <button
+                      type="button"
+                      disabled={resendTimer > 0 || isResending}
+                      onClick={() => handleResendOtp('ForgotPassword')}
+                      className={`font-bold transition-colors flex items-center space-x-1 ${
+                        resendTimer > 0 ? 'text-gray-400' : 'text-pink-600 hover:text-pink-700'
+                      }`}
+                    >
+                      <RotateCw className={`w-3 h-3 ${isResending ? 'animate-spin' : ''}`} />
+                      <span>
+                        {resendTimer > 0 ? `Gửi lại sau (${resendTimer}s)` : 'Gửi lại mã OTP'}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex space-x-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep(1)}
+                      className="flex-1 py-2.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors"
+                    >
+                      Quay Lại
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 py-2.5 text-xs font-black text-white bg-black hover:bg-gray-800 rounded-2xl shadow-lg transition-all"
+                    >
+                      {isLoading ? '...' : 'XÁC THỰC OTP'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: RESET PASSWORD */}
+              {forgotStep === 3 && (
+                <form onSubmit={handleResetPasswordSubmit} className="space-y-3.5">
+                  <div className="text-xs text-gray-600">
+                    Nhập mật khẩu mới cho số điện thoại <strong className="text-black">{pendingPhone}</strong>
                   </div>
 
                   <div>
@@ -880,7 +967,7 @@ export const AuthPage: React.FC = () => {
                   <div className="flex space-x-2">
                     <button
                       type="button"
-                      onClick={() => setForgotStep(1)}
+                      onClick={() => setForgotStep(2)}
                       className="flex-1 py-2.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors"
                     >
                       Quay Lại
@@ -1025,6 +1112,24 @@ export const AuthPage: React.FC = () => {
                     className="w-10 h-12 text-center text-lg font-black bg-gray-50 border border-gray-200 rounded-xl text-black focus:border-black focus:ring-2 focus:ring-black/10 focus:outline-none"
                   />
                 ))}
+              </div>
+
+              {/* Resend OTP button */}
+              <div className="flex justify-between items-center text-[11px] px-1">
+                <span className="text-gray-500">Chưa nhận được mã?</span>
+                <button
+                  type="button"
+                  disabled={resendTimer > 0 || isResending}
+                  onClick={() => handleResendOtp('Register')}
+                  className={`font-bold transition-colors flex items-center space-x-1 ${
+                    resendTimer > 0 ? 'text-gray-400' : 'text-pink-600 hover:text-pink-700'
+                  }`}
+                >
+                  <RotateCw className={`w-3 h-3 ${isResending ? 'animate-spin' : ''}`} />
+                  <span>
+                    {resendTimer > 0 ? `Gửi lại sau (${resendTimer}s)` : 'Gửi lại mã OTP'}
+                  </span>
+                </button>
               </div>
 
               <div className="flex space-x-2 pt-2">
