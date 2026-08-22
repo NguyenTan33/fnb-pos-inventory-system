@@ -122,7 +122,10 @@ builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPhoneService, PhoneService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<IHashService, HashService>();
+builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
+builder.Services.AddScoped<IFacebookAuthService, FacebookAuthService>();
 
 var app = builder.Build();
 

@@ -32,7 +32,13 @@ export const authApi = {
     return res.data;
   },
 
-  // 3. POST /api/Auth/register
+  // 3. POST /api/Auth/facebook-login
+  facebookLogin: async (accessToken: string): Promise<LoginResponse> => {
+    const res = await api.post<LoginResponse>('/Auth/facebook-login', { accessToken });
+    return res.data;
+  },
+
+  // 4. POST /api/Auth/register
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
     const payload = {
       fullName: data.fullName || data.username || '',

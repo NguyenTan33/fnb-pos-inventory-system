@@ -10,7 +10,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<LoginResponse>;
   loginAsDemoRole: (role: UserRole) => void;
   loginWithGoogle: (idToken?: string, email?: string, name?: string) => Promise<void>;
-  loginWithFacebook: () => Promise<void>;
+  loginWithFacebook: (accessToken?: string) => Promise<void>;
   register: (username: string, password: string, phoneNumber: string) => Promise<any>;
   verifyOtp: (phoneNumber: string, otpCode: string) => Promise<any>;
   forgotPassword: (phoneNumber: string) => Promise<any>;
@@ -144,7 +144,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithFacebook = async () => {
+  const loginWithFacebook = async (accessToken?: string) => {
+    if (accessToken) {
+      try {
+        const res = await authApi.facebookLogin(accessToken);
+        setToken(res.accessToken);
+        localStorage.setItem('jwt_token', res.accessToken);
+        if (res.refreshToken) {
+          localStorage.setItem('refresh_token', res.refreshToken);
+        }
+
+        const fbUser: User = {
+          id: 'facebook-user',
+          username: 'Facebook User',
+          fullName: 'Facebook User',
+          roles: ['User'],
+          role: 'User',
+          token: res.accessToken,
+          expiration: res.expiresAt,
+        };
+
+        setUser(fbUser);
+        localStorage.setItem('user_info', JSON.stringify(fbUser));
+        return;
+      } catch (err) {
+        console.warn('Backend Facebook verification failed, falling back to mock');
+      }
+    }
+
     const mockToken = 'facebook-oauth2-jwt-token-sample';
     const fbUser: User = {
       id: 'facebook-user-999',

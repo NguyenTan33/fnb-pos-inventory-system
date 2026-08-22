@@ -16,18 +16,24 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
         private readonly IOtpService _otpService;
         private readonly IPasswordService _passwordService;
         private readonly ITokenService _tokenService;
+        private readonly IGoogleAuthService _googleAuthService;
+        private readonly IFacebookAuthService _facebookAuthService;
 
         // Constructor
         public AuthController(
             IAuthenticationService authenticationService,
             IOtpService otpService,
             IPasswordService passwordService,
-            ITokenService tokenService)
+            ITokenService tokenService,
+            IGoogleAuthService googleAuthService,
+            IFacebookAuthService facebookAuthService)
         {
             _authenticationService = authenticationService;
             _otpService = otpService;
             _passwordService = passwordService;
             _tokenService = tokenService;
+            _googleAuthService = googleAuthService;
+            _facebookAuthService = facebookAuthService;
         }
 
         // REGISTER
@@ -68,6 +74,32 @@ namespace fnb_pos_inventory_system.Areas.Auth.Controllers
         {
             var response =
                 await _authenticationService.LoginAsync(request);
+
+            return Ok(response);
+        }
+
+        // GOOGLE LOGIN
+        [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
+        [HttpPost("google-login")]
+        public async Task<IActionResult> GoogleLogin(
+            [FromBody] GoogleLoginRequest request)
+        {
+            var response =
+                await _googleAuthService.GoogleLoginAsync(request);
+
+            return Ok(response);
+        }
+
+        // FACEBOOK LOGIN
+        [AllowAnonymous]
+        [EnableRateLimiting("AuthPolicy")]
+        [HttpPost("facebook-login")]
+        public async Task<IActionResult> FacebookLogin(
+            [FromBody] FacebookLoginRequest request)
+        {
+            var response =
+                await _facebookAuthService.FacebookLoginAsync(request);
 
             return Ok(response);
         }
