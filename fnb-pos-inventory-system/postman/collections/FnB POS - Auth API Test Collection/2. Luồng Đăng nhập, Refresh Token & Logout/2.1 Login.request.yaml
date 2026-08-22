@@ -23,8 +23,5 @@ scripts:
       if (jsonData.refreshToken) {
           pm.environment.set('refreshToken', jsonData.refreshToken);
       }
-      if (jsonData.userId) {
-          pm.environment.set('userId', jsonData.userId);
-      }
     language: text/javascript
 order: 1000

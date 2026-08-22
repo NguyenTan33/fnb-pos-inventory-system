@@ -12,40 +12,75 @@ export interface User {
 }
 
 export interface LoginRequest {
-  username: string;
-  passwordHash: string;
+  phoneNumber?: string;
+  username?: string;
+  password?: string;
+  passwordHash?: string;
 }
 
 export interface LoginResponse {
-  token: string;
+  accessToken?: string;
+  token?: string;
   refreshToken?: string;
-  expiration: string;
-  userId: string;
-  username: string;
-  roles: string[];
+  expiresAt?: string;
+  expiration?: string;
+  userId?: string;
+  username?: string;
+  roles?: string[];
+  message?: string;
+}
+
+export interface GoogleLoginRequest {
+  idToken: string;
 }
 
 export interface RegisterRequest {
-  username: string;
-  passwordHash: string;
-  phoneNumber: string;
+  fullName?: string;
+  username?: string;
+  password?: string;
+  passwordHash?: string;
+  phoneNumber?: string;
 }
 
 export interface RegisterResponse {
-  userId: string;
-  username: string;
-  phoneNumber: string;
+  userId?: string;
+  id?: string;
+  username?: string;
+  phoneNumber?: string;
   message?: string;
 }
 
 export interface VerifyRegisterOtpRequest {
   phoneNumber: string;
-  otpCode: string;
+  otp?: string;
+  otpCode?: string;
 }
 
 export interface VerifyRegisterOtpResponse {
-  message: string;
-  isVerified: boolean;
+  message?: string;
+  isVerified?: boolean;
+  isSuccess?: boolean;
+}
+
+export interface ForgotPasswordRequest {
+  phoneNumber: string;
+}
+
+export interface ForgotPasswordResponse {
+  message?: string;
+}
+
+export interface ResetPasswordRequest {
+  phoneNumber: string;
+  resetToken?: string;
+  otpCode?: string;
+  newPassword?: string;
+  newPasswordHash?: string;
+}
+
+export interface ResetPasswordResponse {
+  message?: string;
+  isSuccess?: boolean;
 }
 
 export interface Area {

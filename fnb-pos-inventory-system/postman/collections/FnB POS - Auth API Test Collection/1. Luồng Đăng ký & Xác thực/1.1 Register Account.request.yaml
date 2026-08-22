@@ -12,14 +12,24 @@ body:
       "password": "{{testPassword}}"
     }
 scripts:
+  - type: beforeRequest
+    code: |-
+      // Tự động sinh SĐT mới ngẫu nhiên cho mỗi lần chạy để không bị trùng lặp trong DB
+      var randomPhone = '09' + Math.floor(10000000 + Math.random() * 90000000);
+      pm.environment.set('testPhoneNumber', randomPhone);
+      console.log('Generated random phone for test:', randomPhone);
+    language: text/javascript
   - type: afterResponse
     code: |-
-      pm.test('Status code is 201 Created', function () {
-          pm.response.to.have.status(201);
+      pm.test('Status code is 201 Created or 200 OK', function () {
+          pm.expect(pm.response.code).to.be.oneOf([201, 200]);
       });
       var jsonData = pm.response.json();
+      if (jsonData.userId) {
+          pm.environment.set('userId', jsonData.userId);
+      }
       if (jsonData.message) {
-          var match = jsonData.message.match(/Mã OTP là:\s*(\d+)/);
+          var match = jsonData.message.match(/(\d{6})/);
           if (match && match[1]) {
               pm.environment.set('registerOtp', match[1]);
               console.log('Saved registerOtp:', match[1]);

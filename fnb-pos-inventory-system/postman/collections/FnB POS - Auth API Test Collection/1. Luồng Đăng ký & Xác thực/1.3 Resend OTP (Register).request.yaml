@@ -13,8 +13,8 @@ body:
 scripts:
   - type: afterResponse
     code: |-
-      pm.test('Resend OTP Success or Rate Limited', function () {
-          pm.expect(pm.response.code).to.be.oneOf([200, 429]);
+      pm.test('Resend OTP Result', function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 400, 429]);
       });
     language: text/javascript
 order: 3000

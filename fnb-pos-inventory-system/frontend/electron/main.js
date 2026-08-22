@@ -1,6 +1,9 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
+// Allow local ASP.NET Core HTTPS self-signed dev certificates (https://localhost:7076)
+app.commandLine.appendSwitch('ignore-certificate-errors');
+
 let mainWindow;
 
 function createWindow() {

@@ -23,4 +23,4 @@ scripts:
           pm.environment.set('refreshToken', jsonData.refreshToken);
       }
     language: text/javascript
-order: 2000
+order: 3000

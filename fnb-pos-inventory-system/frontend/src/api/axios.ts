@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Detect custom env API URL or default directly to ASP.NET Core dev backend (https://localhost:7076/api)
+const envApiUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+const defaultApiBaseUrl = 'https://localhost:7076/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: envApiUrl || defaultApiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,12 +24,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for status codes & error messages
+// Response interceptor for status codes (including HTTP 200, 201 Created)
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token on 401 Unauthorized
       localStorage.removeItem('jwt_token');
       localStorage.removeItem('user_info');
     }
