@@ -70,12 +70,39 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
 
             if (!httpResponse.IsSuccessStatusCode)
             {
+                var errorContent = await httpResponse.Content.ReadAsStringAsync();
+                try
+                {
+                    using var doc = JsonDocument.Parse(errorContent);
+                    if (doc.RootElement.TryGetProperty("error", out var errorElement) &&
+                        errorElement.TryGetProperty("message", out var messageElement))
+                    {
+                        throw new BusinessException($"Xác thực Facebook thất bại: {messageElement.GetString()}");
+                    }
+                }
+                catch (BusinessException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Fallback
+                }
+
                 throw new BusinessException("Xác thực Facebook Access Token thất bại hoặc Token đã hết hạn.");
             }
 
             // 3. Deserialize Facebook user profile
             var jsonString = await httpResponse.Content.ReadAsStringAsync();
-            var fbUser = JsonSerializer.Deserialize<FacebookUserInfoResponse>(jsonString);
+            FacebookUserInfoResponse? fbUser = null;
+            try
+            {
+                fbUser = JsonSerializer.Deserialize<FacebookUserInfoResponse>(jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new BusinessException($"Không thể đọc dữ liệu phản hồi từ Facebook: {ex.Message}");
+            }
 
             if (fbUser == null || string.IsNullOrWhiteSpace(fbUser.Id))
             {
@@ -98,7 +125,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
                     FullName = fullName,
                     Email = email,
                     UserName = email,
-                    PhoneNumber = string.Empty,
+                    PhoneNumber = $"fb_{fbUser.Id}",
                     EmailConfirmed = true,
                     PhoneNumberConfirmed = true
                 };
@@ -111,8 +138,15 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
                     throw new BusinessException($"Không thể tạo tài khoản Facebook: {errors}");
                 }
 
-                // Assign default "User" role
-                await _userManager.AddToRoleAsync(account, "User");
+                // Assign default "User" role if role exists
+                try
+                {
+                    await _userManager.AddToRoleAsync(account, "User");
+                }
+                catch
+                {
+                    // Ignore if role assignment is optional
+                }
             }
 
             // 7. Generate Access Token (JWT) via TokenService

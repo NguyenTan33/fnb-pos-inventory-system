@@ -1,4 +1,4 @@
-﻿using fnb_pos_inventory_system.Exceptions;
+using fnb_pos_inventory_system.Exceptions;
 using System.Net;
 using System.Text.Json;
 
@@ -8,13 +8,16 @@ namespace fnb_pos_inventory_system.Middlewares
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+        private readonly IWebHostEnvironment _env;
 
         public ExceptionHandlingMiddleware(
             RequestDelegate next,
-            ILogger<ExceptionHandlingMiddleware> logger)
+            ILogger<ExceptionHandlingMiddleware> logger,
+            IWebHostEnvironment env)
         {
             _next = next;
             _logger = logger;
+            _env = env;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -40,11 +43,8 @@ namespace fnb_pos_inventory_system.Middlewares
             HttpContext context,
             BusinessException ex)
         {
-            context.Response.StatusCode =
-                StatusCodes.Status400BadRequest;
-
-            context.Response.ContentType =
-                "application/json";
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/json";
 
             var response = new
             {
@@ -52,7 +52,6 @@ namespace fnb_pos_inventory_system.Middlewares
             };
 
             var json = JsonSerializer.Serialize(response);
-
             await context.Response.WriteAsync(json);
         }
 
@@ -61,23 +60,20 @@ namespace fnb_pos_inventory_system.Middlewares
             Exception ex)
         {
             // Log lỗi thật để developer kiểm tra
-            _logger.LogError(
-                ex,
-                "Unhandled exception occurred.");
+            _logger.LogError(ex, "Unhandled exception occurred: {Message}", ex.Message);
 
-            context.Response.StatusCode =
-                StatusCodes.Status500InternalServerError;
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
 
-            context.Response.ContentType =
-                "application/json";
-
+            // Nếu ở môi trường Development, trả về chi tiết lỗi thật để dễ debug
             var response = new
             {
-                message = "Đã xảy ra lỗi hệ thống."
+                message = _env.IsDevelopment() 
+                    ? $"Đã xảy ra lỗi hệ thống: {ex.Message} {(ex.InnerException != null ? $" -> {ex.InnerException.Message}" : "")}"
+                    : "Đã xảy ra lỗi hệ thống."
             };
 
             var json = JsonSerializer.Serialize(response);
-
             await context.Response.WriteAsync(json);
         }
     }

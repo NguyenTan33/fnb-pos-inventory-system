@@ -71,7 +71,7 @@ namespace fnb_pos_inventory_system.Areas.Auth.Services.Implementations
                     FullName = fullName,
                     Email = email,
                     UserName = email,
-                    PhoneNumber = string.Empty,
+                    PhoneNumber = !string.IsNullOrWhiteSpace(payload.Subject) ? $"gg_{payload.Subject}" : null,
                     EmailConfirmed = true,
                     PhoneNumberConfirmed = true
                 };
